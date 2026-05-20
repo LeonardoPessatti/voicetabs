@@ -31,5 +31,4 @@ pub fn run() {
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-    drop(_guard);
 }
