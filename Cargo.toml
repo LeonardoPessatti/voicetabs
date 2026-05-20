@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["src-tauri"]
+# Future members: "stt_worker" (added in phase 3)
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["VoiceTabs"]
+license = "MIT"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
