@@ -494,7 +494,7 @@ custom-protocol = ["tauri/custom-protocol"]
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
-        "languages": ["English", "PortugueseBrazilian"]
+        "languages": ["English", "PortugueseBR"]
       }
     }
   }
