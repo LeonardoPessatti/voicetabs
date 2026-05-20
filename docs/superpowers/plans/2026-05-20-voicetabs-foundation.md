@@ -427,7 +427,7 @@ default-run = "voicetabs"
 
 [lib]
 name = "voicetabs_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
@@ -490,7 +490,6 @@ custom-protocol = ["tauri/custom-protocol"]
     "icon": ["icons/icon.png"],
     "windows": {
       "nsis": {
-        "installerIcon": "icons/icon.png",
         "displayLanguageSelector": false,
         "languages": ["English", "PortugueseBrazilian"]
       }

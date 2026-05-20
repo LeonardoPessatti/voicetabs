@@ -31,7 +31,6 @@
     "icon": ["icons/icon.png"],
     "windows": {
       "nsis": {
-        "installerIcon": "icons/icon.png",
         "displayLanguageSelector": false,
         "languages": ["English", "PortugueseBrazilian"]
       }
