@@ -32,6 +32,9 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Build frontend bundle (needed for tauri::generate_context!)
+        run: npm run build
+
       - name: Rust unit tests
         working-directory: src-tauri
         run: cargo test
