@@ -19,6 +19,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    document.title = t("app.title");
+  }, [t]);
+
   if (!tabs.loaded) {
     return <main className="app" />;
   }
