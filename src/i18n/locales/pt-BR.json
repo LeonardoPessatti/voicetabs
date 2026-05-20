@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "VoiceTabs",
+    "tagline": "Anote falando."
+  },
+  "tabs": {
+    "newTab": "Nova aba",
+    "newTabTitle": "Sem título",
+    "rename": "Renomear",
+    "close": "Fechar",
+    "confirmCloseNonEmpty": "Esta aba tem conteúdo. Fechar mesmo assim?"
+  },
+  "settings": {
+    "open": "Configurações",
+    "language": "Idioma",
+    "languagePtBr": "Português (Brasil)",
+    "languageEn": "English",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar"
+  },
+  "capture": {
+    "modeAlwaysOn": "Sempre ativo",
+    "modePtt": "Push-to-talk"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "VoiceTabs",
+    "tagline": "Take notes by speaking."
+  },
+  "tabs": {
+    "newTab": "New tab",
+    "newTabTitle": "Untitled",
+    "rename": "Rename",
+    "close": "Close",
+    "confirmCloseNonEmpty": "This tab has content. Close anyway?"
+  },
+  "settings": {
+    "open": "Settings",
+    "language": "Language",
+    "languagePtBr": "Português (Brasil)",
+    "languageEn": "English",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "capture": {
+    "modeAlwaysOn": "Always on",
+    "modePtt": "Push-to-talk"
+  }
+}
