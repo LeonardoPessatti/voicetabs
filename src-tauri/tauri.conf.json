@@ -28,7 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/icon.png"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,

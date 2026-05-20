@@ -24,6 +24,9 @@ dist-ssr
 .DS_Store
 Thumbs.db
 
+# Tauri 2 generated schemas (regenerated per build)
+/src-tauri/gen
+
 # Tauri user data (do not commit user audio / DB / models)
 *.log
 

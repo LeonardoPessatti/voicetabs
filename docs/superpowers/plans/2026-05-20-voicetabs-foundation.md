@@ -133,6 +133,9 @@ dist-ssr
 .DS_Store
 Thumbs.db
 
+# Tauri 2 generated schemas (regenerated per build)
+/src-tauri/gen
+
 # Tauri user data (do not commit user audio / DB / models)
 *.log
 ```
@@ -487,7 +490,7 @@ custom-protocol = ["tauri/custom-protocol"]
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/icon.png"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
@@ -555,6 +558,29 @@ $src = "$env:USERPROFILE\.cargo\registry\cache"
 
 If you don't have a quick source, run `npm create tauri-app@latest _scratch -- --template react-ts -y` in a temporary directory and copy `_scratch/src-tauri/icons/icon.png` to `src-tauri/icons/icon.png`. Then delete `_scratch`.
 
+```powershell
+
+# Also produce icons/icon.ico — Tauri's Windows build links a Windows resource
+# file that embeds an ICO. Generating it from the PNG keeps both in sync.
+$src = New-Object System.Drawing.Bitmap("src-tauri\icons\icon.png")
+$icoStream = New-Object System.IO.MemoryStream
+$sizes = @(16, 32, 48, 256)
+# Build a minimal multi-size ICO. For a placeholder, a single 32x32 frame is
+# enough for Windows to accept it.
+$frame = New-Object System.Drawing.Bitmap 32, 32
+$gIco = [System.Drawing.Graphics]::FromImage($frame)
+$gIco.DrawImage($src, 0, 0, 32, 32)
+$gIco.Dispose()
+$iconHandle = $frame.GetHicon()
+$icon = [System.Drawing.Icon]::FromHandle($iconHandle)
+$fs = [System.IO.File]::OpenWrite("src-tauri\icons\icon.ico")
+$icon.Save($fs)
+$fs.Close()
+$icon.Dispose()
+$frame.Dispose()
+$src.Dispose()
+```
+
 - [ ] **Step 8: Commit**
 
 ```powershell
@@ -574,7 +600,15 @@ npm install
 ```
 Expected: no errors; `node_modules/` populated.
 
-- [ ] **Step 2: Verify Cargo build**
+- [ ] **Step 2: Build the frontend once** so `tauri::generate_context!()` finds `../dist`
+
+Run:
+```powershell
+npm run build
+```
+Expected: `dist/index.html` is produced. The Rust build needs this file to exist before the macro expansion in `generate_context!()` runs.
+
+- [ ] **Step 3: Verify Cargo build**
 
 Run:
 ```powershell
@@ -582,7 +616,7 @@ cargo build --manifest-path src-tauri/Cargo.toml
 ```
 Expected: compiles. First build will be slow (Tauri pulls many deps).
 
-- [ ] **Step 3: Verify `npm run tauri dev` opens a window**
+- [ ] **Step 4: Verify `npm run tauri dev` opens a window**
 
 Run:
 ```powershell
@@ -590,7 +624,7 @@ npm run tauri dev
 ```
 Expected: a window titled "VoiceTabs" opens, showing the placeholder heading. Press Ctrl+C in the terminal to stop.
 
-- [ ] **Step 4: No commit needed** (lockfiles are committed in the next task if desired; verify the build works first).
+- [ ] **Step 5: No commit needed** (lockfiles are committed in the next task if desired; verify the build works first).
 
 ---
 
