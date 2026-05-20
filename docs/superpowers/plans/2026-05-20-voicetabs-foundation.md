@@ -309,7 +309,7 @@ git commit -m "chore: cargo workspace root"
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [react()],
   clearScreen: false,
   server: {
@@ -372,7 +372,6 @@ export default function App() {
 ```css
 :root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #1e1e1e;
 }
