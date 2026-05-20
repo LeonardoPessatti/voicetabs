@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod db;
 pub mod logging;
 pub mod paths;
@@ -18,6 +19,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(db)
+        .invoke_handler(tauri::generate_handler![
+            commands::tabs::tabs_list,
+            commands::tabs::tabs_create,
+            commands::tabs::tabs_rename,
+            commands::tabs::tabs_delete,
+            commands::tabs::tabs_reorder,
+        ])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
