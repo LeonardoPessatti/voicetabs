@@ -2,50 +2,52 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { TabStrip } from "./components/TabStrip";
+import { SettingsDrawer } from "./components/SettingsDrawer";
 import { useTabsStore } from "./stores/tabsStore";
+import { useSettingsStore } from "./stores/settingsStore";
 
 export default function App() {
   const { t } = useTranslation();
-  const {
-    tabs,
-    activeTabId,
-    loaded,
-    load,
-    setActive,
-    createTab,
-    renameTab,
-    deleteTab,
-    reorderTabs,
-  } = useTabsStore();
+  const tabs = useTabsStore();
+  const settings = useSettingsStore();
 
   useEffect(() => {
-    if (!loaded) {
-      void load();
-    }
-  }, [loaded, load]);
+    void (async () => {
+      await settings.load();
+      await tabs.load();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (!loaded) {
+  if (!tabs.loaded) {
     return <main className="app" />;
   }
 
   return (
     <main className="app">
       <TabStrip
-        tabs={tabs}
-        activeId={activeTabId}
-        onSelect={(id) => void setActive(id)}
-        onCreate={() => void createTab(t("tabs.newTabTitle"))}
-        onRename={(id, title) => void renameTab(id, title)}
-        onClose={(id) => void deleteTab(id)}
-        onReorder={(ordered) => void reorderTabs(ordered)}
+        tabs={tabs.tabs}
+        activeId={tabs.activeTabId}
+        onSelect={(id) => void tabs.setActive(id)}
+        onCreate={() => void tabs.createTab(t("tabs.newTabTitle"))}
+        onRename={(id, title) => void tabs.renameTab(id, title)}
+        onClose={(id) => void tabs.deleteTab(id)}
+        onReorder={(ordered) => void tabs.reorderTabs(ordered)}
       />
       <div className="tab-body">
-        {tabs.length > 0 && activeTabId != null && (
+        {tabs.tabs.length > 0 && tabs.activeTabId != null && (
           <p style={{ padding: 16, color: "#888" }}>
-            {tabs.find((t) => t.id === activeTabId)?.title}
+            {tabs.tabs.find((t) => t.id === tabs.activeTabId)?.title}
           </p>
         )}
       </div>
+      <footer className="app-footer">
+        <span />
+        <button onClick={settings.openDrawer} className="footer-button">
+          ⚙ {t("settings.open")}
+        </button>
+      </footer>
+      <SettingsDrawer />
     </main>
   );
 }
