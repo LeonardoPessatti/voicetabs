@@ -193,7 +193,6 @@ license = "MIT"
 [profile.release]
 opt-level = 3
 lto = "thin"
-codegen-units = 1
 strip = "symbols"
 ```
 
