@@ -79,3 +79,9 @@ html, body, #root {
 .tab-strip__new:hover {
   color: #fff;
 }
+
+.tab-body {
+  flex: 1;
+  overflow-y: auto;
+  background: #1e1e1e;
+}
