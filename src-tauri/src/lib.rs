@@ -25,6 +25,8 @@ pub fn run() {
             commands::tabs::tabs_rename,
             commands::tabs::tabs_delete,
             commands::tabs::tabs_reorder,
+            commands::settings::settings_get,
+            commands::settings::settings_set,
         ])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
