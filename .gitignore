@@ -26,3 +26,8 @@ Thumbs.db
 
 # Tauri user data (do not commit user audio / DB / models)
 *.log
+
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
