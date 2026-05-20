@@ -1,3 +1,4 @@
+pub mod db;
 pub mod logging;
 pub mod paths;
 
@@ -10,7 +11,13 @@ pub fn run() {
         }
     };
 
+    let db_path = paths::app_data_dir()
+        .expect("app data dir")
+        .join("voicetabs.db");
+    let db = db::open(&db_path).expect("open db");
+
     tauri::Builder::default()
+        .manage(db)
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
