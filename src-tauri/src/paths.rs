@@ -18,3 +18,9 @@ pub fn app_data_dir() -> anyhow::Result<PathBuf> {
 pub fn log_dir() -> anyhow::Result<PathBuf> {
     Ok(app_data_dir()?.join("logs"))
 }
+
+pub fn audio_dir() -> anyhow::Result<PathBuf> {
+    let dir = app_data_dir()?.join("audio");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
