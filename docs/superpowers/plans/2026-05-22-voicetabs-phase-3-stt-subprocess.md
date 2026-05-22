@@ -186,16 +186,16 @@ The Phase 3 model is `ggml-large-v3-turbo-q5_0.bin` from HuggingFace (`ggerganov
 **Files:**
 - Create: `src-tauri/resources/ggml-large-v3-turbo-q5_0.bin` (local only)
 
-- [ ] **Step 1: Download the model**
+- [x] **Step 1: Download the model**
 
-Run this PowerShell snippet from the repo root. It uses `Invoke-WebRequest` with progress display; the file is ~590 MB.
+Run this PowerShell snippet from the repo root. It uses `Invoke-WebRequest` with progress display; the file is ~547 MB.
 
 ```powershell
 $Url    = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
 $Out    = "src-tauri\resources\ggml-large-v3-turbo-q5_0.bin"
-$Expect = "9c863a02a3bdcdc8d1b3b7e34b0c9b6da57d77f6fc1d2c70d34ff5dc6c0fbd2e"   # see note below
+$Expect = "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"   # verified 2026-05-22
 if (-not (Test-Path $Out)) {
-    Write-Host "Downloading $Url (~590 MB)..."
+    Write-Host "Downloading $Url (~547 MB)..."
     $ProgressPreference = "SilentlyContinue"  # speeds up Invoke-WebRequest
     Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing
     $ProgressPreference = "Continue"
@@ -208,9 +208,9 @@ if ($Got -ne $Expect) {
 }
 ```
 
-> **Note for the executor:** The expected SHA-256 above is a placeholder. The first time you run this, the script will print the actual hash and warn. Verify the hash against the HuggingFace model page (the SHA shown on the file's "View raw" link), then paste it into this script and re-run; the second run should be silent. **Do not** trust a third-party mirror; only use the canonical `huggingface.co/ggerganov/whisper.cpp` URL above. After verifying once, future contributors can re-run this same command and check against the now-known hash.
+> **Note:** The expected SHA-256 above was verified against the canonical `huggingface.co/ggerganov/whisper.cpp` URL on 2026-05-22 (file size 574,041,195 bytes / ~547 MB). Future contributors can re-run this same command and the script will be silent on a clean download. **Do not** trust a third-party mirror; only use the canonical URL above.
 
-- [ ] **Step 2: Confirm the file exists and the size is plausible**
+- [x] **Step 2: Confirm the file exists and the size is plausible**
 
 ```powershell
 $f = Get-Item src-tauri\resources\ggml-large-v3-turbo-q5_0.bin
@@ -218,9 +218,9 @@ Write-Host ("Size: {0:N0} bytes ({1:N1} MB)" -f $f.Length, ($f.Length / 1MB))
 if ($f.Length -lt 500MB) { throw "Model file looks truncated" }
 ```
 
-Expected: ~590 MB.
+Expected: ~547 MB (574,041,195 bytes).
 
-- [ ] **Step 3: Confirm git does not track it**
+- [x] **Step 3: Confirm git does not track it**
 
 ```powershell
 git status --porcelain src-tauri/resources/
@@ -228,7 +228,7 @@ git status --porcelain src-tauri/resources/
 
 Expected output: empty (or only `.gitkeep` if Task 1 wasn't committed yet). The `.bin` file must NOT appear.
 
-- [ ] **Step 4: No commit — this is a local file only.**
+- [x] **Step 4: No commit — this is a local file only.** (Plan doc updated separately to record the verified SHA-256 and actual size.)
 
 ---
 
