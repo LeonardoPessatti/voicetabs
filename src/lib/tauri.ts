@@ -63,3 +63,26 @@ export const captureApi = {
     return invoke<CaptureStatus>("capture_status");
   },
 };
+
+export type SttStatus =
+  | { state: "loading"; backend: string }
+  | { state: "ready"; backend: string; model_id: string }
+  | { state: "restarting"; backend: string }
+  | { state: "error"; message: string };
+
+export const sttApi = {
+  status(): Promise<SttStatus> {
+    return invoke<SttStatus>("stt_status");
+  },
+};
+
+export type TranscriptionEvent = {
+  request_id: string;
+  text: string;
+  avg_logprob: number;
+  no_speech_prob: number;
+  duration_ms: number;
+  started_at_ms: number;
+  ended_at_ms: number;
+  audio_path: string;
+};

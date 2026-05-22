@@ -72,6 +72,7 @@ pub fn run() {
             commands::capture::capture_start,
             commands::capture::capture_stop,
             commands::capture::capture_status,
+            commands::stt::stt_status,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import { CaptureToggle } from "./components/CaptureToggle";
 import { SettingsDrawer } from "./components/SettingsDrawer";
+import { SttStatusDot } from "./components/SttStatusDot";
 import { TabStrip } from "./components/TabStrip";
 import { useCaptureStore } from "./stores/captureStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useSttStore } from "./stores/sttStore";
 import { useTabsStore } from "./stores/tabsStore";
 
 export default function App() {
@@ -13,6 +15,7 @@ export default function App() {
   const tabs = useTabsStore();
   const settings = useSettingsStore();
   const capture = useCaptureStore();
+  const stt = useSttStore();
 
   useEffect(() => {
     void (async () => {
@@ -20,9 +23,12 @@ export default function App() {
       await tabs.load();
       await capture.refresh();
       capture.startPolling();
+      await stt.refresh();
+      stt.startPolling();
     })();
     return () => {
       capture.stopPolling();
+      stt.stopPolling();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -59,6 +65,7 @@ export default function App() {
           onStart={() => void capture.startCapture()}
           onStop={() => void capture.stopCapture()}
         />
+        <SttStatusDot status={stt.status} />
         <button onClick={settings.openDrawer} className="footer-button">
           ⚙ {t("settings.open")}
         </button>

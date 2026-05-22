@@ -26,5 +26,11 @@
     "toggleOn": "🎤 Capturando",
     "starting": "Iniciando…",
     "errorPrefix": "Erro:"
+  },
+  "stt": {
+    "ready": "Pronto",
+    "loading": "Carregando modelo",
+    "restarting": "Reiniciando",
+    "error": "Erro"
   }
 }
