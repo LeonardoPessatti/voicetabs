@@ -160,3 +160,11 @@ html, body, #root {
   padding: 6px 8px;
   font-size: 13px;
 }
+
+.capture-toggle--on {
+  color: #5cd97c;
+}
+
+.capture-toggle--error {
+  color: #ff6b6b;
+}
