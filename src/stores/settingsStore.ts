@@ -4,13 +4,16 @@ import { settingsApi } from "../lib/tauri";
 import i18n, { SupportedLocale, SUPPORTED_LOCALES } from "../i18n";
 
 const LOCALE_KEY = "ui_locale";
+const VOCAB_KEY = "vocab_terms";
 
 type SettingsState = {
   uiLocale: SupportedLocale;
   drawerOpen: boolean;
+  vocabTerms: string[];
 
   load: () => Promise<void>;
   setLocale: (locale: SupportedLocale) => Promise<void>;
+  setVocabTerms: (terms: string[]) => Promise<void>;
   openDrawer: () => void;
   closeDrawer: () => void;
 };
@@ -18,24 +21,36 @@ type SettingsState = {
 export const useSettingsStore = create<SettingsState>((set) => ({
   uiLocale: "pt-BR",
   drawerOpen: false,
+  vocabTerms: [],
 
   async load() {
     const stored = await settingsApi.get(LOCALE_KEY);
+    let uiLocale: SupportedLocale;
     if (SUPPORTED_LOCALES.includes(stored as SupportedLocale)) {
-      // A stored value exists — apply it.
-      const locale = stored as SupportedLocale;
-      await i18n.changeLanguage(locale);
-      document.documentElement.lang = locale;
-      set({ uiLocale: locale });
+      uiLocale = stored as SupportedLocale;
+      await i18n.changeLanguage(uiLocale);
+      document.documentElement.lang = uiLocale;
     } else {
-      // No stored value — use whatever i18n is already set to (from initI18n),
-      // or fall back to navigator language detection.
-      const current = SUPPORTED_LOCALES.includes(i18n.language as SupportedLocale)
+      uiLocale = SUPPORTED_LOCALES.includes(i18n.language as SupportedLocale)
         ? (i18n.language as SupportedLocale)
         : (navigator.language?.toLowerCase().startsWith("en") ? "en" : "pt-BR");
-      document.documentElement.lang = current;
-      set({ uiLocale: current });
+      document.documentElement.lang = uiLocale;
     }
+
+    const vocabRaw = await settingsApi.get(VOCAB_KEY);
+    let vocabTerms: string[] = [];
+    if (vocabRaw !== null) {
+      try {
+        const parsed = JSON.parse(vocabRaw);
+        if (Array.isArray(parsed)) {
+          vocabTerms = parsed.filter((x): x is string => typeof x === "string");
+        }
+      } catch {
+        vocabTerms = [];
+      }
+    }
+
+    set({ uiLocale, vocabTerms });
   },
 
   async setLocale(locale) {
@@ -43,6 +58,12 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     await i18n.changeLanguage(locale);
     document.documentElement.lang = locale;
     set({ uiLocale: locale });
+  },
+
+  async setVocabTerms(terms) {
+    const cleaned = terms.map((t) => t.trim()).filter((t) => t.length > 0);
+    await settingsApi.set(VOCAB_KEY, JSON.stringify(cleaned));
+    set({ vocabTerms: cleaned });
   },
 
   openDrawer() {

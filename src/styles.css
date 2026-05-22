@@ -236,3 +236,18 @@ html, body, #root {
   justify-content: center;
   color: #888;
 }
+
+.drawer__textarea {
+  background: #1e1e1e;
+  color: #fff;
+  border: 1px solid #3a3a3a;
+  padding: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.drawer__hint {
+  color: #888;
+  font-size: 11px;
+  margin-top: 4px;
+}

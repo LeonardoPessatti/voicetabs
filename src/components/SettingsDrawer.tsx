@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useSettingsStore } from "../stores/settingsStore";
 import { SupportedLocale } from "../i18n";
+import { VocabSettings } from "./VocabSettings";
 
 export function SettingsDrawer() {
   const { t } = useTranslation();
@@ -28,6 +29,8 @@ export function SettingsDrawer() {
             <option value="en">{t("settings.languageEn")}</option>
           </select>
         </section>
+
+        <VocabSettings />
       </aside>
     </div>
   );
