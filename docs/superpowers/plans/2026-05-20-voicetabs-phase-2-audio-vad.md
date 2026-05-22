@@ -99,12 +99,13 @@ Append, in alphabetical order, into the existing `[dependencies]` block of `src-
 cpal = "0.15"
 crossbeam-channel = "0.5"
 hound = "3.5"
-ort = { version = "2", default-features = false, features = ["download-binaries"] }
-voice_activity_detector = "0.2"
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["ndarray", "download-binaries"] }
+voice_activity_detector = "0.2.1"
 ```
 
 Notes for the executor:
-- `ort` declared explicitly (rather than relying on the transitive dep through `voice_activity_detector`) so we control the `download-binaries` feature flag. Without that flag, ort fails to find the ONNX Runtime library at runtime.
+- `ort` is **exact-version pinned** to `=2.0.0-rc.10` because `voice_activity_detector 0.2.1` requires that exact pre-release. A bare `"2"` semver range refuses to resolve pre-releases. `=rc.10` is the only version pair that compiles today.
+- The `ndarray` feature is required by `voice_activity_detector` and `download-binaries` ensures the ONNX Runtime DLL is fetched at build time (no manual DLL shipping needed).
 - If the build fails because `ort` cannot reach its binary release host (rare but possible on a sandboxed CI runner), report **BLOCKED** — fallback would be to load a system-installed ONNX Runtime DLL, which we don't want to take on yet.
 
 - [ ] **Step 3: Run `cargo check` to fetch and compile the new deps**
