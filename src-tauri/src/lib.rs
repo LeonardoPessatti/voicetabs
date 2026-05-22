@@ -21,8 +21,12 @@ pub fn run() {
         .join("voicetabs.db");
     let db = db::open(&db_path).expect("open db");
 
+    let audio_dir = paths::audio_dir().expect("audio dir");
+    let capture = capture::CaptureController::spawn(audio_dir);
+
     tauri::Builder::default()
         .manage(db)
+        .manage(capture)
         .invoke_handler(tauri::generate_handler![
             commands::tabs::tabs_list,
             commands::tabs::tabs_create,
@@ -31,6 +35,9 @@ pub fn run() {
             commands::tabs::tabs_reorder,
             commands::settings::settings_get,
             commands::settings::settings_set,
+            commands::capture::capture_start,
+            commands::capture::capture_stop,
+            commands::capture::capture_status,
         ])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
