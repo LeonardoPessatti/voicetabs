@@ -3,6 +3,7 @@ pub mod commands;
 pub mod db;
 pub mod logging;
 pub mod paths;
+pub mod vad;
 
 pub fn run() {
     let _guard = match paths::log_dir().and_then(logging::init) {
