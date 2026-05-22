@@ -40,3 +40,8 @@ tempfile = "3"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+[[bin]]
+name = "stub_worker"
+path = "tests/fixtures/stub_worker.rs"
+required-features = []
