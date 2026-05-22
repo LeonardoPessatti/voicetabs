@@ -18,6 +18,14 @@ pub enum CaptureStatus {
     Error { message: String },
 }
 
+/// Emitted by the worker thread whenever an utterance WAV has been written.
+#[derive(Debug, Clone)]
+pub struct UtteranceFinalized {
+    pub audio_path: PathBuf,
+    pub started_at_ms: u64,
+    pub ended_at_ms: u64,
+}
+
 enum Cmd {
     Start,
     Stop,
@@ -28,6 +36,7 @@ enum Cmd {
 pub struct CaptureController {
     cmd_tx: Sender<Cmd>,
     status: Arc<Mutex<CaptureStatus>>,
+    utterance_rx: Receiver<UtteranceFinalized>,
 }
 
 impl CaptureController {
@@ -35,13 +44,18 @@ impl CaptureController {
     /// runs for the lifetime of the process; we never join it.
     pub fn spawn(output_dir: PathBuf) -> Self {
         let (cmd_tx, cmd_rx) = unbounded::<Cmd>();
+        let (utt_tx, utt_rx) = unbounded::<UtteranceFinalized>();
         let status = Arc::new(Mutex::new(CaptureStatus::Idle));
         let status_for_worker = status.clone();
         std::thread::Builder::new()
             .name("voicetabs-capture".into())
-            .spawn(move || worker_loop(cmd_rx, status_for_worker, output_dir))
+            .spawn(move || worker_loop(cmd_rx, status_for_worker, output_dir, utt_tx))
             .expect("spawn capture thread");
-        Self { cmd_tx, status }
+        Self {
+            cmd_tx,
+            status,
+            utterance_rx: utt_rx,
+        }
     }
 
     pub fn start(&self) {
@@ -55,12 +69,19 @@ impl CaptureController {
     pub fn status(&self) -> CaptureStatus {
         self.status.lock().clone()
     }
+
+    /// Subscribe to utterance finalizations. The receiver is cheap to clone
+    /// because crossbeam-channel receivers are MPMC.
+    pub fn utterance_receiver(&self) -> Receiver<UtteranceFinalized> {
+        self.utterance_rx.clone()
+    }
 }
 
 fn worker_loop(
     cmd_rx: Receiver<Cmd>,
     status: Arc<Mutex<CaptureStatus>>,
     output_dir: PathBuf,
+    utt_tx: Sender<UtteranceFinalized>,
 ) {
     let mut stream_handle: Option<InputStreamHandle> = None;
     let mut vad_model: Option<VadModel> = None;
@@ -123,7 +144,7 @@ fn worker_loop(
                     }
                     let model = vad_model.as_mut().expect("model loaded above");
                     accumulator.extend_from_slice(&frame_16k);
-                    process_chunks(&mut accumulator, model, &mut vad_sm, &mut builder);
+                    process_chunks(&mut accumulator, model, &mut vad_sm, &mut builder, &utt_tx);
                 }
             }
         } else {
@@ -156,6 +177,7 @@ fn process_chunks(
     model: &mut VadModel,
     sm: &mut VadStateMachine,
     builder: &mut UtteranceBuilder,
+    utt_tx: &Sender<UtteranceFinalized>,
 ) {
     while accumulator.len() >= CHUNK_SAMPLES {
         let chunk: Vec<f32> = accumulator.drain(..CHUNK_SAMPLES).collect();
@@ -176,14 +198,29 @@ fn process_chunks(
             //     utterance first; the event finalizes including this chunk.
             let _ = builder.push_frame(&chunk);
             if let Some(path) = builder.on_vad_event(event) {
-                tracing::info!("wrote utterance WAV: {path:?}");
+                publish_utterance(utt_tx, path, ts_ms);
             }
         } else if let Some(path) = builder.push_frame(&chunk) {
             // No edge event but the max-duration cap finalized a WAV.
-            tracing::info!("wrote (max-cap) utterance WAV: {path:?}");
+            publish_utterance(utt_tx, path, ts_ms);
             sm.force_idle();
         }
     }
+}
+
+fn publish_utterance(utt_tx: &Sender<UtteranceFinalized>, path: PathBuf, ended_at_ms: u64) {
+    tracing::info!("wrote utterance WAV: {path:?}");
+    // Pull start time from the filename if possible (`<unix_ms>.wav` format).
+    let started_at_ms = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(ended_at_ms);
+    let _ = utt_tx.send(UtteranceFinalized {
+        audio_path: path,
+        started_at_ms,
+        ended_at_ms,
+    });
 }
 
 fn unix_now_ms() -> u64 {

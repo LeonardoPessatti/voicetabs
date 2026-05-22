@@ -1,3 +1,3 @@
 pub mod controller;
 
-pub use controller::{CaptureController, CaptureStatus};
+pub use controller::{CaptureController, CaptureStatus, UtteranceFinalized};
