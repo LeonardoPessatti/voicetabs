@@ -2,6 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::db::{tabs as repo, Db};
+use crate::routing::ActiveTab;
 
 #[derive(Debug, Serialize)]
 pub struct CommandError {
@@ -54,4 +55,33 @@ pub fn tabs_delete(id: i64, db: State<'_, Db>) -> Result<(), CommandError> {
 #[tauri::command]
 pub fn tabs_reorder(ordered_ids: Vec<i64>, db: State<'_, Db>) -> Result<(), CommandError> {
     repo::reorder(&db, &ordered_ids, now_ms()).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn tabs_set_active(
+    id: i64,
+    db: State<'_, Db>,
+    active: State<'_, ActiveTab>,
+) -> Result<(), CommandError> {
+    // Verify the tab exists. If not, we still don't surface an error to the
+    // user (the frontend may race with delete); just don't update the atomic.
+    let exists = db
+        .with(|c| {
+            c.query_row::<i64, _, _>(
+                "SELECT COUNT(1) FROM tabs WHERE id = ?",
+                [id],
+                |r| r.get(0),
+            )
+        })
+        .map_err(|e| CommandError {
+            code: "SQL_ERROR".into(),
+            message: e.to_string(),
+        })?;
+    if exists == 0 {
+        // No-op; the frontend will re-issue `setActive` after refreshing.
+        tracing::debug!("tabs_set_active: tab {id} not found, ignoring");
+        return Ok(());
+    }
+    active.set(id);
+    Ok(())
 }

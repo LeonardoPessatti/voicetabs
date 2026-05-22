@@ -60,9 +60,12 @@ pub fn run() {
     });
     let stt_status_for_state = stt_status.clone();
 
+    let active_tab = routing::ActiveTab::new();
+
     tauri::Builder::default()
         .manage(db)
         .manage(capture)
+        .manage(active_tab.clone())
         .manage(stt_status_for_state)
         .invoke_handler(tauri::generate_handler![
             commands::tabs::tabs_list,
@@ -70,6 +73,7 @@ pub fn run() {
             commands::tabs::tabs_rename,
             commands::tabs::tabs_delete,
             commands::tabs::tabs_reorder,
+            commands::tabs::tabs_set_active,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::capture::capture_start,

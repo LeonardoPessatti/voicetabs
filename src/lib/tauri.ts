@@ -29,6 +29,9 @@ export const tabsApi = {
   reorder(orderedIds: number[]): Promise<void> {
     return invoke<void>("tabs_reorder", { orderedIds });
   },
+  setActive(id: number): Promise<void> {
+    return invoke<void>("tabs_set_active", { id });
+  },
 };
 
 export const settingsApi = {

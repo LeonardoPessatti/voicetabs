@@ -35,7 +35,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tabs.length === 0) {
       const fresh = await tabsApi.create(defaultTitle());
       set({ tabs: [fresh], activeTabId: fresh.id, loaded: true });
-      await settingsApi.set(ACTIVE_KEY, String(fresh.id));
+      await Promise.all([
+        settingsApi.set(ACTIVE_KEY, String(fresh.id)),
+        tabsApi.setActive(fresh.id),
+      ]);
       return;
     }
 
@@ -44,18 +47,25 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       await settingsApi.set(ACTIVE_KEY, String(activeTabId));
     }
 
+    await tabsApi.setActive(activeTabId);
     set({ tabs, activeTabId, loaded: true });
   },
 
   async setActive(id) {
     set({ activeTabId: id });
-    await settingsApi.set(ACTIVE_KEY, String(id));
+    await Promise.all([
+      settingsApi.set(ACTIVE_KEY, String(id)),
+      tabsApi.setActive(id),
+    ]);
   },
 
   async createTab(title) {
     const tab = await tabsApi.create(title);
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
-    await settingsApi.set(ACTIVE_KEY, String(tab.id));
+    await Promise.all([
+      settingsApi.set(ACTIVE_KEY, String(tab.id)),
+      tabsApi.setActive(tab.id),
+    ]);
     return tab;
   },
 
@@ -73,14 +83,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (remaining.length === 0) {
       const fresh = await tabsApi.create(defaultTitle());
       set({ tabs: [fresh], activeTabId: fresh.id });
-      await settingsApi.set(ACTIVE_KEY, String(fresh.id));
+      await Promise.all([
+        settingsApi.set(ACTIVE_KEY, String(fresh.id)),
+        tabsApi.setActive(fresh.id),
+      ]);
       return;
     }
 
     let nextActive = get().activeTabId;
     if (nextActive === id) {
       nextActive = remaining[0].id;
-      await settingsApi.set(ACTIVE_KEY, String(nextActive));
+      await Promise.all([
+        settingsApi.set(ACTIVE_KEY, String(nextActive)),
+        tabsApi.setActive(nextActive),
+      ]);
     }
     set({ tabs: remaining, activeTabId: nextActive });
   },

@@ -33,6 +33,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "capture_start" || command === "capture_stop") {
       return undefined;
     }
+    if (command === "tabs_set_active") {
+      return undefined;
+    }
     if (command === "stt_status") {
       return { state: "ready", backend: "cpu", model_id: "stub" };
     }
