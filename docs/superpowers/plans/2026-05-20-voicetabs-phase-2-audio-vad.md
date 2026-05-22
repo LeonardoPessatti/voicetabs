@@ -925,6 +925,12 @@ impl PreRoll {
 
     /// Push samples; oldest evicted if over capacity.
     pub fn push(&mut self, samples: &[f32]) {
+        // Zero-capacity ring is a no-op (the eviction guard `len == capacity`
+        // would be `0 == 0`, but `pop_front` on an empty deque is a no-op
+        // while `push_back` would still run — leaving samples behind).
+        if self.capacity == 0 {
+            return;
+        }
         for &s in samples {
             if self.deque.len() == self.capacity {
                 self.deque.pop_front();
