@@ -5,4 +5,5 @@ pub mod protocol;
 pub mod status;
 pub mod supervisor;
 
-pub use supervisor::SttSupervisor;
+pub use status::{SttStatus, SttStatusHandle};
+pub use supervisor::{SttSupervisor, SupervisorConfig, SupervisorError};
