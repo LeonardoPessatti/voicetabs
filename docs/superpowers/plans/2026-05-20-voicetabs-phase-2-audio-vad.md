@@ -643,8 +643,8 @@ mod tests {
     use super::*;
 
     /// Chunk size used by every test: 32 ms (matches Silero at 16 kHz / 512).
-    /// At 32 ms, rising needs 4 chunks (120/32 = 3.75 → 3), falling needs
-    /// 21 chunks (700/32 = 21.875 → 21).
+    /// At 32 ms, rising needs 3 chunks (120/32 = 3 by integer division),
+    /// falling needs 21 chunks (700/32 = 21 by integer division).
     const CHUNK_MS: u32 = 32;
 
     fn observe_n(sm: &mut VadStateMachine, prob: f32, n: u32) -> Vec<VadEvent> {
@@ -735,8 +735,9 @@ mod tests {
 
     #[test]
     fn timestamp_is_passed_through_to_event() {
+        // rising_required_chunks = 120/32 = 3, so the 3rd observation fires.
         let mut sm = VadStateMachine::new(CHUNK_MS);
-        for i in 0..3 {
+        for i in 0..2 {
             assert!(sm.observe(0.9, i * 100).is_none());
         }
         let ev = sm.observe(0.9, 999).expect("rising edge");
