@@ -5,6 +5,7 @@ pub mod db;
 pub mod hallucination;
 pub mod logging;
 pub mod paths;
+pub mod routing;
 pub mod stt;
 pub mod utterance;
 pub mod vad;
