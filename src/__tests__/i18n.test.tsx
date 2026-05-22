@@ -8,6 +8,7 @@ import { initI18n } from "../i18n";
 // in jsdom (no Tauri host). One persisted tab named "Test" is returned for the
 // initial list; subsequent calls (set, create, rename, etc.) are no-ops.
 vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: vi.fn((p: string) => `asset://${p}`),
   invoke: vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === "tabs_list") {
       return [
@@ -38,6 +39,20 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (command === "stt_status") {
       return { state: "ready", backend: "cpu", model_id: "stub" };
+    }
+    if (command === "segments_list_for_tab") {
+      return [];
+    }
+    if (command === "segments_update" || command === "segments_delete") {
+      return undefined;
+    }
+    if (command === "segments_retranscribe") {
+      return {
+        text: "retranscribed",
+        model_id: "ggml-small-q5_0",
+        avg_logprob: -0.3,
+        no_speech_prob: 0.02,
+      };
     }
     // All other commands resolve to undefined / no-op.
     return undefined;

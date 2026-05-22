@@ -89,3 +89,43 @@ export type TranscriptionEvent = {
   ended_at_ms: number;
   audio_path: string;
 };
+
+export type Segment = {
+  id: number;
+  tab_id: number;
+  position: number;
+  text: string;
+  original_text: string;
+  audio_path: string;
+  started_at: number;
+  ended_at: number;
+  duration_ms: number;
+  vocab_snapshot: string;
+  avg_logprob: number;
+  no_speech_prob: number;
+  model_id: string;
+};
+
+export type RetranscribeMode = "current" | "snapshot";
+
+export type RetranscribeResult = {
+  text: string;
+  model_id: string;
+  avg_logprob: number;
+  no_speech_prob: number;
+};
+
+export const segmentsApi = {
+  listForTab(tabId: number): Promise<Segment[]> {
+    return invoke<Segment[]>("segments_list_for_tab", { tabId });
+  },
+  update(id: number, text: string): Promise<void> {
+    return invoke<void>("segments_update", { id, text });
+  },
+  delete(id: number): Promise<void> {
+    return invoke<void>("segments_delete", { id });
+  },
+  retranscribe(id: number, mode: RetranscribeMode): Promise<RetranscribeResult> {
+    return invoke<RetranscribeResult>("segments_retranscribe", { id, mode });
+  },
+};
