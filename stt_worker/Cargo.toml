@@ -1,0 +1,38 @@
+[package]
+name = "stt_worker"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "VoiceTabs STT worker — whisper.cpp subprocess"
+
+[lib]
+name = "stt_worker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "stt_worker_cpu"
+path = "src/main.rs"
+required-features = []
+
+[[bin]]
+name = "stt_worker_cuda"
+path = "src/main.rs"
+required-features = ["cuda"]
+
+[features]
+default = []
+cuda = ["whisper-rs/cuda"]
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+whisper-rs = { version = "0.13", default-features = false }
+
+[dev-dependencies]
+hound = "3.5"
+tempfile = "3"
