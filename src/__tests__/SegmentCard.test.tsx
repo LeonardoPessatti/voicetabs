@@ -1,0 +1,163 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (p: string) => `asset://localhost/${encodeURIComponent(p)}`,
+}));
+
+import { SegmentCard } from "../components/SegmentCard";
+import { Segment } from "../lib/tauri";
+
+function mkSegment(text = "Hello world", id = 1): Segment {
+  return {
+    id,
+    tab_id: 1,
+    position: 0,
+    text,
+    original_text: text,
+    audio_path: `${id}.wav`,
+    started_at: 0,
+    ended_at: 1_000,
+    duration_ms: 1_000,
+    vocab_snapshot: "[]",
+    avg_logprob: -0.3,
+    no_speech_prob: 0.02,
+    model_id: "ggml-small-q5_0",
+  };
+}
+
+describe("SegmentCard", () => {
+  const noop = () => {};
+
+  it("renders the segment text", () => {
+    render(
+      <SegmentCard
+        segment={mkSegment("the rain in spain")}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    expect(screen.getByText("the rain in spain")).toBeInTheDocument();
+  });
+
+  it("exposes a Play button (audio replay)", () => {
+    render(
+      <SegmentCard
+        segment={mkSegment()}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /play|reproduzir/i })).toBeInTheDocument();
+  });
+
+  it("clicking Edit swaps in a textarea and Save calls onEdit", () => {
+    const onEdit = vi.fn();
+    render(
+      <SegmentCard
+        segment={mkSegment("orig")}
+        onEdit={onEdit}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /edit|editar/i }));
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: "edited" } });
+    fireEvent.click(screen.getByRole("button", { name: /save|salvar/i }));
+    expect(onEdit).toHaveBeenCalledWith(1, "edited");
+  });
+
+  it("Esc cancels edit without firing onEdit", () => {
+    const onEdit = vi.fn();
+    render(
+      <SegmentCard
+        segment={mkSegment("orig")}
+        onEdit={onEdit}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /edit|editar/i }));
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+    expect(onEdit).not.toHaveBeenCalled();
+    // Back to read mode — text is still visible as a paragraph.
+    expect(screen.getByText("orig")).toBeInTheDocument();
+  });
+
+  it("calls onDelete without confirm for short text", () => {
+    const onDelete = vi.fn();
+    // Spy on confirm to make sure it's not called.
+    const confirmSpy = vi.spyOn(window, "confirm");
+    render(
+      <SegmentCard
+        segment={mkSegment("short")}
+        onEdit={noop}
+        onDelete={onDelete}
+        onRetranscribe={noop}
+      />,
+    );
+    // Open the overflow menu and click Delete.
+    fireEvent.click(screen.getByRole("button", { name: /more|mais/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /delete|excluir/i }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onDelete).toHaveBeenCalledWith(1);
+    confirmSpy.mockRestore();
+  });
+
+  it("confirms before deleting non-trivial content (>20 chars)", () => {
+    const onDelete = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      <SegmentCard
+        segment={mkSegment("a much longer sentence that exceeds twenty chars by some margin")}
+        onEdit={noop}
+        onDelete={onDelete}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /more|mais/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /delete|excluir/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(onDelete).toHaveBeenCalledWith(1);
+    confirmSpy.mockRestore();
+  });
+
+  it("does not delete if confirm is cancelled", () => {
+    const onDelete = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(
+      <SegmentCard
+        segment={mkSegment("a much longer sentence that exceeds twenty chars by some margin")}
+        onEdit={noop}
+        onDelete={onDelete}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /more|mais/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /delete|excluir/i }));
+    expect(onDelete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it("overflow menu fires re-transcribe with the chosen mode", () => {
+    const onRetranscribe = vi.fn();
+    render(
+      <SegmentCard
+        segment={mkSegment()}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={onRetranscribe}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /more|mais/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /current vocab|vocabulário atual/i }));
+    expect(onRetranscribe).toHaveBeenCalledWith(1, "current");
+
+    fireEvent.click(screen.getByRole("button", { name: /more|mais/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /snapshot vocab|vocabulário original/i }));
+    expect(onRetranscribe).toHaveBeenCalledWith(1, "snapshot");
+  });
+});

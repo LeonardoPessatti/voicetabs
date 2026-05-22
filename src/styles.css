@@ -182,3 +182,44 @@ html, body, #root {
 .stt-dot--loading { background: #ffce5c; }
 .stt-dot--restarting { background: #ffce5c; }
 .stt-dot--error { background: #ff6b6b; }
+
+.segment-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 0 0 8px 0;
+  background: #232323;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: border-color 100ms ease;
+}
+
+.segment-card:hover {
+  border-color: #3a3a3a;
+}
+
+.segment-card__body { flex: 1; min-width: 0; }
+.segment-card__text { margin: 0; line-height: 1.5; color: #eaeaea; white-space: pre-wrap; word-break: break-word; }
+.segment-card__text--placeholder { color: #888; font-style: italic; }
+.segment-card__textarea { width: 100%; min-height: 80px; background: #1e1e1e; color: #eaeaea; border: 1px solid #3a3a3a; padding: 8px; font: inherit; }
+.segment-card__actions { display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
+.segment-card:hover .segment-card__actions,
+.segment-card:focus-within .segment-card__actions { opacity: 1; }
+.segment-card__actions button { background: transparent; border: 0; color: #aaa; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px; }
+.segment-card__actions button:hover { color: #fff; background: #2c2c2c; }
+.segment-card__menu-wrap { position: relative; }
+.segment-card__menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 220px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+}
+.segment-card__menu button { padding: 8px 12px; text-align: left; }
+.segment-card__menu button:hover { background: #333; color: #fff; }
