@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["src-tauri"]
-# Future members: "stt_worker" (added in phase 3)
+members = ["src-tauri", "stt_worker"]
 
 [workspace.package]
 version = "0.1.0"

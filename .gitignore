@@ -37,3 +37,6 @@ Thumbs.db
 
 # Crash dumps
 *.stackdump
+
+# Bundled Whisper models — not committed; downloaded locally per README.
+/src-tauri/resources/*.bin
