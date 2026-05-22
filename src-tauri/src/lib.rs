@@ -2,6 +2,7 @@ pub mod audio;
 pub mod capture;
 pub mod commands;
 pub mod db;
+pub mod hallucination;
 pub mod logging;
 pub mod paths;
 pub mod stt;
