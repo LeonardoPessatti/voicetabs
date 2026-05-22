@@ -21,6 +21,10 @@
   },
   "capture": {
     "modeAlwaysOn": "Always on",
-    "modePtt": "Push-to-talk"
+    "modePtt": "Push-to-talk",
+    "toggleOff": "🎤 Capture: OFF",
+    "toggleOn": "🎤 Capturing",
+    "starting": "Starting…",
+    "errorPrefix": "Error:"
   }
 }
