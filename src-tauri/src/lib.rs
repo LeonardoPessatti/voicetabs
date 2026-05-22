@@ -4,6 +4,7 @@ pub mod commands;
 pub mod db;
 pub mod logging;
 pub mod paths;
+pub mod stt;
 pub mod utterance;
 pub mod vad;
 
