@@ -19,9 +19,22 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # whisper-rs-sys calls bindgen at build time, which needs libclang.
+      # The shipped pre-generated bindings are Linux-only (glibc ABI), so on
+      # Windows MSVC we MUST run bindgen — therefore LLVM is required.
+      - name: Install LLVM (libclang for bindgen)
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "18"
+          directory: ${{ runner.temp }}/llvm
+
+      # whisper-rs-sys uses cmake to build the bundled whisper.cpp sources.
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ./src-tauri -> target
+          workspaces: . -> target
 
       - name: Install npm deps
         run: npm ci
