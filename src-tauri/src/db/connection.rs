@@ -21,7 +21,10 @@ impl Db {
         f(&mut guard)
     }
 
-    #[cfg(test)]
+    /// Build a `Db` from an existing `rusqlite::Connection`. Intended for
+    /// unit + integration tests that want an in-memory database; not used by
+    /// production code, but kept on the public API so external test files
+    /// (which compile as separate crates) can call it.
     pub fn from_connection(conn: Connection) -> Self {
         Db { inner: Arc::new(Mutex::new(conn)) }
     }

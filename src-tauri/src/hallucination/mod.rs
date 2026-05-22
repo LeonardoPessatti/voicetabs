@@ -1,3 +1,3 @@
 pub mod filter;
 
-pub use filter::{evaluate, Decision, DropReason, Input, BLOCKLIST};
+pub use filter::{evaluate, Decision, DropReason, Input, Thresholds, BLOCKLIST};

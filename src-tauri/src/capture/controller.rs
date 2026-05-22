@@ -7,8 +7,10 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::audio::{spawn_input_stream, AudioConfig, InputStreamHandle};
-use crate::utterance::{builder::UtteranceConfig, UtteranceBuilder};
-use crate::vad::{VadModel, VadStateMachine, CHUNK_SAMPLES};
+use crate::db::{settings as settings_repo, Db};
+use crate::routing::ActiveTab;
+use crate::utterance::{builder::UtteranceConfig, FinalizedUtterance, UtteranceBuilder};
+use crate::vad::{VadEvent, VadModel, VadStateMachine, CHUNK_SAMPLES};
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -18,12 +20,33 @@ pub enum CaptureStatus {
     Error { message: String },
 }
 
-/// Emitted by the worker thread whenever an utterance WAV has been written.
+/// Emitted by the worker thread for every finalized utterance.
+///
+/// Carries the snapshots taken at the VAD rising edge (`start_tab_id`,
+/// `vocab_snapshot`, `language`) alongside the WAV path + in-memory samples.
+/// The downstream async drainer in `lib.rs` consumes these, runs STT + RMS
+/// + the hallucination filter, then either inserts a segment row + emits
+/// `segment-created` or drops with a logged reason. The WAV remains on disk
+/// either way so dropped utterances are diagnosable.
 #[derive(Debug, Clone)]
 pub struct UtteranceFinalized {
     pub audio_path: PathBuf,
+    pub samples: Vec<f32>,
+    pub start_tab_id: i64,
+    pub vocab_snapshot: Vec<String>,
+    pub language: String,
     pub started_at_ms: u64,
     pub ended_at_ms: u64,
+}
+
+/// Snapshotted at each VAD rising edge. Pass-by-value (no `&self`) throughout
+/// the rising-edge → finalize chain so nothing can silently re-read state
+/// mid-utterance. This is the entire mechanism that protects A3.
+#[derive(Debug, Clone)]
+struct UtteranceMeta {
+    start_tab_id: i64,
+    vocab_terms: Vec<String>,
+    language: String,
 }
 
 enum Cmd {
@@ -32,7 +55,7 @@ enum Cmd {
 }
 
 /// Public capture controller, held inside Tauri's `manage()` slot.
-/// `Send + Sync` — the `Stream` itself lives only on the worker thread.
+/// `Send + Sync` — the cpal `Stream` itself lives only on the worker thread.
 pub struct CaptureController {
     cmd_tx: Sender<Cmd>,
     status: Arc<Mutex<CaptureStatus>>,
@@ -42,14 +65,28 @@ pub struct CaptureController {
 impl CaptureController {
     /// Spawn the worker thread and return the controller handle. The worker
     /// runs for the lifetime of the process; we never join it.
-    pub fn spawn(output_dir: PathBuf) -> Self {
+    ///
+    /// `db` is used to read the `vocab_terms` / `language` settings at each
+    /// VAD rising edge (snapshot semantics). `active_tab` is read once at
+    /// each rising edge as well; whatever the user does mid-utterance cannot
+    /// change the routing.
+    pub fn spawn(output_dir: PathBuf, db: Db, active_tab: ActiveTab) -> Self {
         let (cmd_tx, cmd_rx) = unbounded::<Cmd>();
         let (utt_tx, utt_rx) = unbounded::<UtteranceFinalized>();
         let status = Arc::new(Mutex::new(CaptureStatus::Idle));
         let status_for_worker = status.clone();
         std::thread::Builder::new()
             .name("voicetabs-capture".into())
-            .spawn(move || worker_loop(cmd_rx, status_for_worker, output_dir, utt_tx))
+            .spawn(move || {
+                worker_loop(
+                    cmd_rx,
+                    status_for_worker,
+                    output_dir,
+                    db,
+                    active_tab,
+                    utt_tx,
+                )
+            })
             .expect("spawn capture thread");
         Self {
             cmd_tx,
@@ -77,10 +114,13 @@ impl CaptureController {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn worker_loop(
     cmd_rx: Receiver<Cmd>,
     status: Arc<Mutex<CaptureStatus>>,
     output_dir: PathBuf,
+    db: Db,
+    active_tab: ActiveTab,
     utt_tx: Sender<UtteranceFinalized>,
 ) {
     let mut stream_handle: Option<InputStreamHandle> = None;
@@ -88,6 +128,9 @@ fn worker_loop(
     let mut vad_sm = VadStateMachine::new(32);
     let mut builder = UtteranceBuilder::new(UtteranceConfig::default(), output_dir);
     let mut accumulator: Vec<f32> = Vec::with_capacity(CHUNK_SAMPLES * 2);
+    // The A3-defining state: this is `Some(meta)` for the lifetime of one
+    // utterance. Set on rising edge; consumed on finalize.
+    let mut current_meta: Option<UtteranceMeta> = None;
 
     loop {
         // Clone the frames receiver out of the optional handle BEFORE the
@@ -104,6 +147,7 @@ fn worker_loop(
                             stream_handle = None;
                             vad_sm.force_idle();
                             accumulator.clear();
+                            current_meta = None;
                             *status.lock() = CaptureStatus::Idle;
                         }
                         Err(_) => return,
@@ -144,7 +188,16 @@ fn worker_loop(
                     }
                     let model = vad_model.as_mut().expect("model loaded above");
                     accumulator.extend_from_slice(&frame_16k);
-                    process_chunks(&mut accumulator, model, &mut vad_sm, &mut builder, &utt_tx);
+                    process_chunks(
+                        &mut accumulator,
+                        model,
+                        &mut vad_sm,
+                        &mut builder,
+                        &mut current_meta,
+                        &db,
+                        &active_tab,
+                        &utt_tx,
+                    );
                 }
             }
         } else {
@@ -172,11 +225,15 @@ fn worker_loop(
 
 /// Drain `accumulator` in 512-sample windows, running VAD + state machine +
 /// utterance builder for each window. Leaves any remainder in place.
+#[allow(clippy::too_many_arguments)]
 fn process_chunks(
     accumulator: &mut Vec<f32>,
     model: &mut VadModel,
     sm: &mut VadStateMachine,
     builder: &mut UtteranceBuilder,
+    current_meta: &mut Option<UtteranceMeta>,
+    db: &Db,
+    active_tab: &ActiveTab,
     utt_tx: &Sender<UtteranceFinalized>,
 ) {
     while accumulator.len() >= CHUNK_SAMPLES {
@@ -190,6 +247,40 @@ fn process_chunks(
         };
         let ts_ms = unix_now_ms();
         if let Some(event) = sm.observe(prob, ts_ms) {
+            // *** A3-CRITICAL SECTION ***
+            // On rising edge, snapshot the active tab id AND the vocab list +
+            // language EXACTLY ONCE. From here until finalize, nothing reads
+            // `active_tab` or `settings::vocab_terms` again. This is the
+            // entire mechanism that protects A3.
+            if matches!(event, VadEvent::RisingEdge { .. }) {
+                let tab_id = active_tab.snapshot();
+                let vocab_terms: Vec<String> =
+                    settings_repo::get::<Vec<String>>(db, "vocab_terms")
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default();
+                // Settings.language is reserved for v1; hardcode "pt" for now.
+                let language: String = settings_repo::get::<String>(db, "language")
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "pt".into());
+                if let Some(tab_id) = tab_id {
+                    *current_meta = Some(UtteranceMeta {
+                        start_tab_id: tab_id,
+                        vocab_terms,
+                        language,
+                    });
+                } else {
+                    // No active tab. Don't even start an utterance — the
+                    // builder would still write a WAV but we'd have nowhere
+                    // to route the segment. Force the VAD back to idle and
+                    // drop this chunk.
+                    sm.force_idle();
+                    tracing::warn!("rising edge with no active tab; dropping utterance");
+                    continue;
+                }
+            }
+
             // Push the chunk BEFORE handling the event:
             //   - On RisingEdge: the chunk lands in the pre-roll first, then
             //     the event drains the pre-roll into the new current
@@ -197,29 +288,41 @@ fn process_chunks(
             //   - On FallingEdge: the chunk is appended to the current
             //     utterance first; the event finalizes including this chunk.
             let _ = builder.push_frame(&chunk);
-            if let Some(path) = builder.on_vad_event(event) {
-                publish_utterance(utt_tx, path, ts_ms);
+            if let Some(finalized) = builder.on_vad_event(event) {
+                if let Some(meta) = current_meta.take() {
+                    publish_utterance(utt_tx, finalized, meta);
+                }
             }
-        } else if let Some(path) = builder.push_frame(&chunk) {
-            // No edge event but the max-duration cap finalized a WAV.
-            publish_utterance(utt_tx, path, ts_ms);
+        } else if let Some(finalized) = builder.push_frame(&chunk) {
+            // No edge event but the max-duration cap finalized a WAV. The
+            // meta was captured at the original rising edge; consume it now.
+            if let Some(meta) = current_meta.take() {
+                publish_utterance(utt_tx, finalized, meta);
+            }
             sm.force_idle();
         }
     }
 }
 
-fn publish_utterance(utt_tx: &Sender<UtteranceFinalized>, path: PathBuf, ended_at_ms: u64) {
-    tracing::info!("wrote utterance WAV: {path:?}");
-    // Pull start time from the filename if possible (`<unix_ms>.wav` format).
-    let started_at_ms = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(ended_at_ms);
+fn publish_utterance(
+    utt_tx: &Sender<UtteranceFinalized>,
+    finalized: FinalizedUtterance,
+    meta: UtteranceMeta,
+) {
+    tracing::info!(
+        "wrote utterance WAV: {:?} (tab={}, {} vocab terms)",
+        finalized.path,
+        meta.start_tab_id,
+        meta.vocab_terms.len(),
+    );
     let _ = utt_tx.send(UtteranceFinalized {
-        audio_path: path,
-        started_at_ms,
-        ended_at_ms,
+        audio_path: finalized.path,
+        samples: finalized.samples,
+        start_tab_id: meta.start_tab_id,
+        vocab_snapshot: meta.vocab_terms,
+        language: meta.language,
+        started_at_ms: finalized.started_at_ms,
+        ended_at_ms: finalized.ended_at_ms,
     });
 }
 

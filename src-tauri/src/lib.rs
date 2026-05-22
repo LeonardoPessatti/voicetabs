@@ -12,27 +12,16 @@ pub mod vad;
 pub mod vocab;
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use serde::Serialize;
 use tauri::{Emitter, Manager};
 
 use crate::capture::UtteranceFinalized;
+use crate::db::{segments as segments_repo, Db};
+use crate::hallucination::{evaluate, Decision, Input as HInput, Thresholds};
 use crate::stt::gpu::Backend;
 use crate::stt::status::SttStatus;
 use crate::stt::{SttStatusHandle, SttSupervisor, SupervisorConfig};
-
-#[derive(Debug, Clone, Serialize)]
-pub struct TranscriptionEventPayload {
-    pub request_id: String,
-    pub text: String,
-    pub avg_logprob: f32,
-    pub no_speech_prob: f32,
-    pub duration_ms: u64,
-    pub started_at_ms: u64,
-    pub ended_at_ms: u64,
-    pub audio_path: String,
-}
+use crate::vocab::build_initial_prompt;
 
 pub fn run() {
     let _guard = match paths::log_dir().and_then(logging::init) {
@@ -49,7 +38,8 @@ pub fn run() {
     let db = db::open(&db_path).expect("open db");
 
     let audio_dir = paths::audio_dir().expect("audio dir");
-    let capture = capture::CaptureController::spawn(audio_dir);
+    let active_tab = routing::ActiveTab::new();
+    let capture = capture::CaptureController::spawn(audio_dir, db.clone(), active_tab.clone());
     let utt_rx = capture.utterance_receiver();
 
     // GPU autodetect (sync; uses settings cache).
@@ -60,10 +50,8 @@ pub fn run() {
     });
     let stt_status_for_state = stt_status.clone();
 
-    let active_tab = routing::ActiveTab::new();
-
     tauri::Builder::default()
-        .manage(db)
+        .manage(db.clone())
         .manage(capture)
         .manage(active_tab.clone())
         .manage(stt_status_for_state)
@@ -117,11 +105,14 @@ pub fn run() {
                 }
             });
 
-            // Drainer: consume utterances, transcribe, emit Tauri events.
+            // Drainer: consume utterances, run STT + RMS + hallucination
+            // filter, insert kept segments into the DB, and emit
+            // `segment-created` to the frontend.
             let sup_for_drainer = supervisor.clone();
             let app_for_drainer = app_handle.clone();
+            let db_for_drainer = db.clone();
             rt.spawn(async move {
-                drain_utterances(utt_rx, sup_for_drainer, app_for_drainer).await;
+                drain_utterances(utt_rx, sup_for_drainer, app_for_drainer, db_for_drainer).await;
             });
 
             Ok(())
@@ -184,9 +175,11 @@ async fn drain_utterances(
     utt_rx: crossbeam_channel::Receiver<UtteranceFinalized>,
     sup: SttSupervisor,
     app: tauri::AppHandle,
+    db: Db,
 ) {
     // crossbeam_channel is sync; we move blocking recv onto a dedicated thread
-    // and forward into an async channel.
+    // and forward into an async channel so the drainer can `await` without
+    // blocking the runtime.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<UtteranceFinalized>();
     std::thread::Builder::new()
         .name("voicetabs-utt-bridge".into())
@@ -202,70 +195,137 @@ async fn drain_utterances(
     while let Some(u) = rx.recv().await {
         let sup = sup.clone();
         let app = app.clone();
+        let db = db.clone();
         // Spawn per-utterance so a slow transcription doesn't block the queue.
         tokio::spawn(async move {
-            let samples = match read_wav_samples(&u.audio_path) {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::error!("read wav {}: {e}", u.audio_path.display());
-                    return;
-                }
-            };
-            let request_id = uuid::Uuid::new_v4().to_string();
-            match sup
-                .transcribe(
-                    request_id.clone(),
-                    samples,
-                    "pt",
-                    "", // initial_prompt — populated from settings.vocab_terms in Phase 4
-                    Some(u.audio_path.clone()),
-                    u.started_at_ms,
-                )
-                .await
-            {
-                Ok(r) => {
-                    tracing::info!(
-                        "transcription request={} text={:?} ({}ms)",
-                        r.request_id,
-                        r.text,
-                        r.duration_ms
-                    );
-                    let payload = TranscriptionEventPayload {
-                        request_id: r.request_id,
-                        text: r.text,
-                        avg_logprob: r.avg_logprob,
-                        no_speech_prob: r.no_speech_prob,
-                        duration_ms: r.duration_ms,
-                        started_at_ms: u.started_at_ms,
-                        ended_at_ms: u.ended_at_ms,
-                        audio_path: u.audio_path.to_string_lossy().to_string(),
-                    };
-                    if let Err(e) = app.emit("stt-transcription", &payload) {
-                        tracing::warn!("emit stt-transcription failed: {e}");
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("transcription failed for {}: {e}", request_id);
-                }
-            }
+            run_segment_pipeline(u, sup, app, db).await;
         });
     }
-    let _ = Arc::<()>::new(()); // suppress unused import lint for Arc if needed
 }
 
-fn read_wav_samples(path: &std::path::Path) -> anyhow::Result<Vec<f32>> {
-    let mut reader = hound::WavReader::open(path)?;
-    let spec = reader.spec();
-    if spec.sample_rate != 16_000 || spec.channels != 1 {
-        return Err(anyhow::anyhow!(
-            "unexpected wav spec: rate={} channels={}",
-            spec.sample_rate,
-            spec.channels
-        ));
+/// The Phase-4 finalize → STT → RMS → filter → insert → emit pipeline. Lives
+/// in `lib.rs` rather than `controller.rs` because `SttSupervisor::transcribe`
+/// is async and the controller worker is a sync `std::thread`.
+async fn run_segment_pipeline(
+    u: UtteranceFinalized,
+    sup: SttSupervisor,
+    app: tauri::AppHandle,
+    db: Db,
+) {
+    let UtteranceFinalized {
+        audio_path,
+        samples,
+        start_tab_id,
+        vocab_snapshot,
+        language,
+        started_at_ms,
+        ended_at_ms,
+    } = u;
+
+    // 1. RMS on the same samples we wrote to disk. Cheap; runs before STT so
+    //    we have it whether STT succeeds or not.
+    let rms_dbfs = crate::audio::rms_dbfs(&samples);
+
+    // 2. Build initial_prompt and call STT.
+    let initial_prompt = build_initial_prompt(&vocab_snapshot, &language);
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let result = match sup
+        .transcribe(
+            request_id.clone(),
+            samples,
+            &language,
+            &initial_prompt,
+            Some(audio_path.clone()),
+            started_at_ms,
+        )
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                "stt transcribe failed for {}: {e}; keeping WAV at {:?}",
+                request_id,
+                audio_path,
+            );
+            return;
+        }
+    };
+
+    // 3. Hallucination filter.
+    let decision = evaluate(
+        &HInput {
+            text: &result.text,
+            avg_logprob: result.avg_logprob,
+            no_speech_prob: result.no_speech_prob,
+            rms_dbfs,
+        },
+        &Thresholds::default(),
+    );
+    let kept_text = match decision {
+        Decision::Keep => result.text,
+        Decision::Drop(reason) => {
+            tracing::info!(
+                "hallucination filter dropped utterance at {:?}: {:?} \
+                 (text={:?}, no_speech={}, logprob={}, rms_db={})",
+                audio_path,
+                reason,
+                result.text,
+                result.no_speech_prob,
+                result.avg_logprob,
+                rms_dbfs,
+            );
+            return;
+        }
+    };
+
+    // 4. Persist. The `audio_path` column is the file name only (relative to
+    //    %APPDATA%\voicetabs\audio\), per spec §6.1.
+    let file_name = match audio_path.file_name().and_then(|s| s.to_str()) {
+        Some(n) => n.to_string(),
+        None => {
+            tracing::error!("could not extract file name from {:?}", audio_path);
+            return;
+        }
+    };
+    let vocab_snapshot_json =
+        serde_json::to_string(&vocab_snapshot).unwrap_or_else(|_| "[]".into());
+    let duration_ms = ended_at_ms.saturating_sub(started_at_ms) as i64;
+
+    // The supervisor's TranscriptionResult does not carry model_id (the
+    // worker reports it once at handshake via ReadyMessage). Pull it from
+    // the SttStatusHandle, which the supervisor publishes into on every
+    // (re)boot. If the worker isn't Ready right now (shouldn't happen after
+    // a successful transcribe, but be defensive), fall back to a literal.
+    let model_id = match sup.status_handle().get() {
+        SttStatus::Ready { model_id, .. } => model_id,
+        _ => "unknown".into(),
+    };
+
+    let new = segments_repo::NewSegment {
+        tab_id: start_tab_id,
+        text: kept_text,
+        audio_path: file_name,
+        started_at: started_at_ms as i64,
+        ended_at: ended_at_ms as i64,
+        duration_ms,
+        vocab_snapshot: vocab_snapshot_json,
+        avg_logprob: result.avg_logprob as f64,
+        no_speech_prob: result.no_speech_prob as f64,
+        model_id,
+    };
+    let inserted = match segments_repo::insert(&db, &new) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(
+                "segments_repo::insert failed: {e}; orphan WAV at {:?}",
+                audio_path,
+            );
+            return;
+        }
+    };
+
+    // 5. Notify the frontend. The Phase-4 `segmentsStore` listens.
+    if let Err(e) = app.emit("segment-created", &inserted) {
+        tracing::warn!("failed to emit segment-created: {e}");
     }
-    let samples: Vec<f32> = reader
-        .samples::<i16>()
-        .map(|s| s.map(|v| v as f32 / 32_767.0))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(samples)
 }
