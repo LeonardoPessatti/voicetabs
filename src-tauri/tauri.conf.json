@@ -29,6 +29,13 @@
     "active": true,
     "targets": ["nsis"],
     "icon": ["icons/icon.ico", "icons/icon.png"],
+    "externalBin": [
+      "../target/release/stt_worker_cpu",
+      "../target/release/stt_worker_cuda"
+    ],
+    "resources": [
+      "resources/ggml-large-v3-turbo-q5_0.bin"
+    ],
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
