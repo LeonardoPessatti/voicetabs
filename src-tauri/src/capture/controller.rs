@@ -90,6 +90,23 @@ fn worker_loop(
                 }
                 recv(frames_rx) -> frame => {
                     let Ok(frame) = frame else { continue };
+                    // Read the device's native config from the handle. The
+                    // handle is borrowed for the lifetime of this block only;
+                    // we read u32/u16 by value so no lasting borrow remains.
+                    let (src_rate, src_channels) = match &stream_handle {
+                        Some(h) => (h.device_sample_rate, h.device_channels),
+                        None => continue, // stream stopped concurrently
+                    };
+                    // Downmix to mono and resample to 16 kHz before VAD.
+                    let frame_16k = crate::audio::downmix_and_resample(
+                        &frame,
+                        src_rate,
+                        src_channels,
+                        16_000,
+                    );
+                    if frame_16k.is_empty() {
+                        continue;
+                    }
                     // Lazy-load the VAD model the first time we need it.
                     if vad_model.is_none() {
                         match VadModel::new() {
@@ -105,7 +122,7 @@ fn worker_loop(
                         }
                     }
                     let model = vad_model.as_mut().expect("model loaded above");
-                    accumulator.extend_from_slice(&frame);
+                    accumulator.extend_from_slice(&frame_16k);
                     process_chunks(&mut accumulator, model, &mut vad_sm, &mut builder);
                 }
             }
