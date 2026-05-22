@@ -46,3 +46,20 @@ export const settingsApi = {
     return this.set(key, JSON.stringify(value));
   },
 };
+
+export type CaptureStatus =
+  | { state: "idle" }
+  | { state: "capturing"; device_name: string | null }
+  | { state: "error"; message: string };
+
+export const captureApi = {
+  start(): Promise<void> {
+    return invoke<void>("capture_start");
+  },
+  stop(): Promise<void> {
+    return invoke<void>("capture_stop");
+  },
+  status(): Promise<CaptureStatus> {
+    return invoke<CaptureStatus>("capture_status");
+  },
+};
