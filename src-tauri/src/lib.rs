@@ -8,6 +8,7 @@ pub mod paths;
 pub mod stt;
 pub mod utterance;
 pub mod vad;
+pub mod vocab;
 
 use std::path::PathBuf;
 use std::sync::Arc;
