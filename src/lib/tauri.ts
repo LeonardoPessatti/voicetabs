@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
 export type Tab = {
   id: number;
@@ -129,3 +130,9 @@ export const segmentsApi = {
     return invoke<RetranscribeResult>("segments_retranscribe", { id, mode });
   },
 };
+
+export function listenSegmentCreated(
+  handler: (segment: Segment) => void,
+): Promise<UnlistenFn> {
+  return listen<Segment>("segment-created", (e) => handler(e.payload));
+}

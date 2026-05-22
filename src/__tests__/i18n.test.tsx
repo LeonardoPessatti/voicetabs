@@ -59,6 +59,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   }),
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
+
 describe("App locale", () => {
   it("renders with PT-BR locale and shows the new-tab button labeled in PT-BR", async () => {
     initI18n("pt-BR");
