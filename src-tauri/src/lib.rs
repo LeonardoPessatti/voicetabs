@@ -3,6 +3,7 @@ pub mod commands;
 pub mod db;
 pub mod logging;
 pub mod paths;
+pub mod utterance;
 pub mod vad;
 
 pub fn run() {
