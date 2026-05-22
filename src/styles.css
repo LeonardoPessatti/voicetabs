@@ -223,3 +223,16 @@ html, body, #root {
 }
 .segment-card__menu button { padding: 8px 12px; text-align: left; }
 .segment-card__menu button:hover { background: #333; color: #fff; }
+
+.tab-body__list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-body--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}

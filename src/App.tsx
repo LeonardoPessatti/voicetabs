@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { CaptureToggle } from "./components/CaptureToggle";
 import { SettingsDrawer } from "./components/SettingsDrawer";
 import { SttStatusDot } from "./components/SttStatusDot";
+import { TabBody } from "./components/TabBody";
 import { TabStrip } from "./components/TabStrip";
 import { useCaptureStore } from "./stores/captureStore";
+import { useSegmentsStore } from "./stores/segmentsStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useSttStore } from "./stores/sttStore";
 import { useTabsStore } from "./stores/tabsStore";
@@ -16,6 +18,7 @@ export default function App() {
   const settings = useSettingsStore();
   const capture = useCaptureStore();
   const stt = useSttStore();
+  const segments = useSegmentsStore();
 
   useEffect(() => {
     void (async () => {
@@ -25,10 +28,12 @@ export default function App() {
       capture.startPolling();
       await stt.refresh();
       stt.startPolling();
+      await segments.startListening();
     })();
     return () => {
       capture.stopPolling();
       stt.stopPolling();
+      segments.stopListening();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -52,13 +57,7 @@ export default function App() {
         onClose={(id) => void tabs.deleteTab(id)}
         onReorder={(ordered) => void tabs.reorderTabs(ordered)}
       />
-      <div className="tab-body">
-        {tabs.tabs.length > 0 && tabs.activeTabId != null && (
-          <p style={{ padding: 16, color: "#888" }}>
-            {tabs.tabs.find((t) => t.id === tabs.activeTabId)?.title}
-          </p>
-        )}
-      </div>
+      <TabBody activeTabId={tabs.activeTabId} />
       <footer className="app-footer">
         <CaptureToggle
           status={capture.status}
