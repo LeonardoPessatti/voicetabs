@@ -17,7 +17,10 @@
     "languageEn": "English",
     "save": "Salvar",
     "cancel": "Cancelar",
-    "close": "Fechar"
+    "close": "Fechar",
+    "vocabHeading": "Vocabulário",
+    "vocabHint": "Um termo por linha. Termos vão para o prompt da transcrição.",
+    "vocabPlaceholder": "Digite os termos…"
   },
   "capture": {
     "modeAlwaysOn": "Sempre ativo",
@@ -26,6 +29,21 @@
     "toggleOn": "🎤 Capturando",
     "starting": "Iniciando…",
     "errorPrefix": "Erro:"
+  },
+  "segments": {
+    "play": "Reproduzir",
+    "pause": "Pausar",
+    "edit": "Editar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "deleteConfirm": "Excluir este segmento e o áudio original?",
+    "more": "Mais",
+    "retranscribeCurrent": "Re-transcrever (vocabulário atual)",
+    "retranscribeSnapshot": "Re-transcrever (vocabulário original)",
+    "retranscribing": "Transcrevendo…",
+    "emptyState": "Fale algo para começar.",
+    "transcribingPlaceholder": "transcrevendo…"
   },
   "stt": {
     "ready": "Pronto",
