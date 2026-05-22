@@ -1,21 +1,29 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
-import { TabStrip } from "./components/TabStrip";
+import { CaptureToggle } from "./components/CaptureToggle";
 import { SettingsDrawer } from "./components/SettingsDrawer";
-import { useTabsStore } from "./stores/tabsStore";
+import { TabStrip } from "./components/TabStrip";
+import { useCaptureStore } from "./stores/captureStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useTabsStore } from "./stores/tabsStore";
 
 export default function App() {
   const { t } = useTranslation();
   const tabs = useTabsStore();
   const settings = useSettingsStore();
+  const capture = useCaptureStore();
 
   useEffect(() => {
     void (async () => {
       await settings.load();
       await tabs.load();
+      await capture.refresh();
+      capture.startPolling();
     })();
+    return () => {
+      capture.stopPolling();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -46,7 +54,11 @@ export default function App() {
         )}
       </div>
       <footer className="app-footer">
-        <span />
+        <CaptureToggle
+          status={capture.status}
+          onStart={() => void capture.startCapture()}
+          onStop={() => void capture.stopCapture()}
+        />
         <button onClick={settings.openDrawer} className="footer-button">
           ⚙ {t("settings.open")}
         </button>

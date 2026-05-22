@@ -27,6 +27,12 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "settings_get") {
       return null;
     }
+    if (command === "capture_status") {
+      return { state: "idle" };
+    }
+    if (command === "capture_start" || command === "capture_stop") {
+      return undefined;
+    }
     // All other commands resolve to undefined / no-op.
     return undefined;
   }),
