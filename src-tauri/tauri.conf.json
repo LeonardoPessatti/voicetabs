@@ -38,7 +38,7 @@
       "../target/release/stt_worker_cuda"
     ],
     "resources": [
-      "resources/ggml-large-v3-turbo-q5_0.bin"
+      "resources/ggml-small-q5_1.bin"
     ],
     "windows": {
       "nsis": {

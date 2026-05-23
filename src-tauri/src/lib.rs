@@ -172,16 +172,21 @@ pub fn run() {
 }
 
 fn resolve_model_path(app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
+    // For now we bundle the `small` quantized model (~330 MB) so CPU
+    // transcription is usable. The CUDA build path will switch back to
+    // large-v3-turbo for ~0.3-0.8s/utterance on GTX 1060. Tracked in
+    // a follow-up.
     let p = app
         .path()
         .resolve(
-            "resources/ggml-large-v3-turbo-q5_0.bin",
+            "resources/ggml-small-q5_1.bin",
             tauri::path::BaseDirectory::Resource,
         )
         .map_err(|e| anyhow::anyhow!("resolve model path: {e}"))?;
     if !p.exists() {
         return Err(anyhow::anyhow!(
-            "model file not found at {}; did you run the Task 2 download?",
+            "model file not found at {}; download from \
+             https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
             p.display()
         ));
     }
