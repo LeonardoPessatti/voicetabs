@@ -177,6 +177,7 @@ async fn drain_utterances(
     app: tauri::AppHandle,
     db: Db,
 ) {
+    tracing::info!("drain_utterances: started");
     // crossbeam_channel is sync; we move blocking recv onto a dedicated thread
     // and forward into an async channel so the drainer can `await` without
     // blocking the runtime.
@@ -184,15 +185,28 @@ async fn drain_utterances(
     std::thread::Builder::new()
         .name("voicetabs-utt-bridge".into())
         .spawn(move || {
+            tracing::info!("utt-bridge thread: started");
             while let Ok(u) = utt_rx.recv() {
+                tracing::info!(
+                    "utt-bridge: forwarding utterance audio={:?} tab={}",
+                    u.audio_path,
+                    u.start_tab_id,
+                );
                 if tx.send(u).is_err() {
+                    tracing::warn!("utt-bridge: async receiver dropped, exiting");
                     break;
                 }
             }
+            tracing::warn!("utt-bridge: crossbeam channel closed, exiting");
         })
         .expect("spawn utt bridge");
 
     while let Some(u) = rx.recv().await {
+        tracing::info!(
+            "drain_utterances: received utterance audio={:?} tab={}, spawning pipeline",
+            u.audio_path,
+            u.start_tab_id,
+        );
         let sup = sup.clone();
         let app = app.clone();
         let db = db.clone();
@@ -201,6 +215,7 @@ async fn drain_utterances(
             run_segment_pipeline(u, sup, app, db).await;
         });
     }
+    tracing::warn!("drain_utterances: async receiver closed, exiting");
 }
 
 /// The Phase-4 finalize → STT → RMS → filter → insert → emit pipeline. Lives
@@ -225,10 +240,22 @@ async fn run_segment_pipeline(
     // 1. RMS on the same samples we wrote to disk. Cheap; runs before STT so
     //    we have it whether STT succeeds or not.
     let rms_dbfs = crate::audio::rms_dbfs(&samples);
+    tracing::info!(
+        "segment_pipeline: tab={} audio={:?} samples={} rms_dbfs={:.1}",
+        start_tab_id,
+        audio_path,
+        samples.len(),
+        rms_dbfs,
+    );
 
     // 2. Build initial_prompt and call STT.
     let initial_prompt = build_initial_prompt(&vocab_snapshot, &language);
     let request_id = uuid::Uuid::new_v4().to_string();
+    tracing::info!(
+        "segment_pipeline: calling supervisor.transcribe request_id={} initial_prompt={:?}",
+        request_id,
+        initial_prompt,
+    );
     let result = match sup
         .transcribe(
             request_id.clone(),
@@ -240,7 +267,17 @@ async fn run_segment_pipeline(
         )
         .await
     {
-        Ok(r) => r,
+        Ok(r) => {
+            tracing::info!(
+                "segment_pipeline: transcribe OK request_id={} text={:?} no_speech_prob={:.3} avg_logprob={:.3} duration_ms={}",
+                request_id,
+                r.text,
+                r.no_speech_prob,
+                r.avg_logprob,
+                r.duration_ms,
+            );
+            r
+        }
         Err(e) => {
             tracing::warn!(
                 "stt transcribe failed for {}: {e}; keeping WAV at {:?}",
