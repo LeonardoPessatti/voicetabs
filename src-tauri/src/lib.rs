@@ -78,6 +78,56 @@ pub fn run() {
             let model_path = resolve_model_path(&app_handle).expect("resolve model path");
             let worker_binary =
                 resolve_worker_binary(&app_handle, backend).expect("resolve worker binary");
+
+            // Sanity-check whether the on-disk CUDA binary is actually the
+            // CPU build copy (same bytes). If so, the worker WILL run on CPU
+            // regardless of the GPU probe verdict.
+            let worker_label = match backend {
+                Backend::Cuda => {
+                    let cpu_path = worker_binary
+                        .parent()
+                        .map(|p| p.join("stt_worker_cpu.exe"));
+                    let is_placeholder = cpu_path
+                        .as_ref()
+                        .and_then(|p| {
+                            let cuda_bytes = std::fs::metadata(&worker_binary).ok()?.len();
+                            let cpu_bytes = std::fs::metadata(p).ok()?.len();
+                            Some(cuda_bytes == cpu_bytes && cpu_bytes > 0)
+                        })
+                        .unwrap_or(false);
+                    if is_placeholder {
+                        "CUDA (probe) → actually CPU (binary is placeholder copy)"
+                    } else {
+                        "CUDA"
+                    }
+                }
+                Backend::Cpu => "CPU",
+            };
+            let model_name = model_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("(unknown)");
+            let model_size_mb = std::fs::metadata(&model_path)
+                .map(|m| m.len() as f64 / (1024.0 * 1024.0))
+                .unwrap_or(0.0);
+            tracing::warn!(
+                "\n\
+                ═══════════════════════════════════════════════════════════════\n\
+                  STT BACKEND:   {}\n\
+                  Worker binary: {}\n\
+                  Model:         {} ({:.0} MB)\n\
+                  Expected speed: {}\n\
+                ═══════════════════════════════════════════════════════════════",
+                worker_label,
+                worker_binary.display(),
+                model_name,
+                model_size_mb,
+                match (backend, worker_label.contains("placeholder")) {
+                    (Backend::Cuda, false) => "FAST (~0.5-1s per utterance on GTX 1060)",
+                    _ => "SLOW (~5-30s per utterance on CPU, model-dependent)",
+                },
+            );
+
             let cfg = SupervisorConfig {
                 worker_binary,
                 model_path,
