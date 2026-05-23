@@ -62,6 +62,17 @@ jobs:
           Copy-Item target/release/stt_worker_cpu.exe "target/release/stt_worker_cpu-$triple.exe"
           Copy-Item target/release/stt_worker_cpu.exe "target/release/stt_worker_cuda-$triple.exe"
 
+      # bundle.resources in tauri.conf.json points at the ~574 MB Whisper
+      # model. That file is gitignored, so CI has nothing to satisfy the
+      # tauri-build resource-existence pre-check. A zero-byte placeholder
+      # passes the check. The bundle never gets installed/run on CI; the
+      # smoke build is only verifying that the source compiles + bundles.
+      - name: Stub model file for bundle pre-check
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources | Out-Null
+          New-Item -ItemType File -Force -Path src-tauri/resources/ggml-large-v3-turbo-q5_0.bin | Out-Null
+
       - name: Rust unit tests
         working-directory: src-tauri
         run: cargo test
