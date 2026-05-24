@@ -4,6 +4,7 @@
   "description": "Default capabilities for the main window. The audio asset:// scope is declared in tauri.conf.json under app.security.assetProtocol (tauri-plugin-fs is not installed, so no fs:scope-* permission identifier is available here).",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "global-shortcut:default"
   ]
 }

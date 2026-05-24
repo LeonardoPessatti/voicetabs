@@ -29,6 +29,11 @@
       }
     }
   },
+  "plugins": {
+    "global-shortcut": {
+      "all": true
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],
