@@ -53,6 +53,7 @@ pub fn run() {
     let stt_status_for_state = stt_status.clone();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(db.clone())
         .manage(capture)
         .manage(active_tab.clone())
