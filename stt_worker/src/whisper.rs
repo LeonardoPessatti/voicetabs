@@ -1,5 +1,5 @@
-//! Thin wrapper around `whisper-rs`. The whole crate is built once with
-//! either the CPU or CUDA feature flag — the `Engine` doesn't care which.
+//! Thin wrapper around `whisper-rs`. CPU build only — Phase 7 will introduce
+//! a cloud OpenAI path in the main process, not via this subprocess.
 //!
 //! Adapted for `whisper-rs` 0.16. The plan was authored against 0.13, where
 //! per-segment confidence had dedicated getters (`full_get_segment_avg_logprob`,
@@ -55,7 +55,7 @@ pub struct Engine {
 
 impl Engine {
     /// `model_path` is the absolute path to the `ggml-*.bin` file. `n_threads`
-    /// is honored for the CPU build; the CUDA build ignores it internally.
+    /// is the number of threads whisper.cpp uses for inference.
     pub fn load(model_path: &Path, n_threads: i32) -> Result<Self, WhisperError> {
         let cparams = WhisperContextParameters::default();
         let ctx = WhisperContext::new_with_params(model_path, cparams)

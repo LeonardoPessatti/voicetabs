@@ -31,10 +31,12 @@ describe("SttStatusDot", () => {
   });
 
   it("exposes the status text via title attribute for tooltip", () => {
-    const status: SttStatus = { state: "ready", backend: "cuda", model_id: "ggml-large-v3-turbo-q5_0" };
+    const status: SttStatus = { state: "ready", backend: "cpu", model_id: "ggml-small-q5_1" };
     render(<SttStatusDot status={status} />);
     const dot = screen.getByTestId("stt-dot");
     expect(dot).toHaveAttribute("title");
-    expect(dot.getAttribute("title")).toMatch(/cuda/);
+    // backend "cpu" → pretty-printed as "Local CPU"
+    expect(dot.getAttribute("title")).toMatch(/Local CPU/);
+    expect(dot.getAttribute("title")).toMatch(/ggml-small-q5_1/);
   });
 });

@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use voicetabs_lib::stt::gpu::Backend;
+// Backend was an enum from the removed stt::gpu module; backend is now a String.
 use voicetabs_lib::stt::status::SttStatus;
 use voicetabs_lib::stt::{SttStatusHandle, SttSupervisor, SupervisorConfig};
 
@@ -35,7 +35,7 @@ fn make_cfg() -> SupervisorConfig {
         worker_binary: stub_path(),
         model_path: PathBuf::from("unused"), // stub ignores --model
         language: "pt".into(),
-        backend: Backend::Cpu,
+        backend: "cpu".into(),
     }
 }
 

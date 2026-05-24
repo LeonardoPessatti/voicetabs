@@ -51,16 +51,12 @@ jobs:
       # Tauri's build script validates the externalBin path BEFORE compiling
       # the main crate. The path in tauri.conf.json is target/release/...,
       # so the release worker binary must exist before `cargo test` runs.
-      # CI has no CUDA toolkit, so we ship the CPU build only and copy it
-      # under the CUDA filename to satisfy the pre-check (a developer with
-      # CUDA toolkit produces a real CUDA binary on their own machine).
       - name: Build stt_worker (CPU) for externalBin pre-check
         shell: pwsh
         run: |
           cargo build --release -p stt_worker --bin stt_worker_cpu
           $triple = 'x86_64-pc-windows-msvc'
           Copy-Item target/release/stt_worker_cpu.exe "target/release/stt_worker_cpu-$triple.exe"
-          Copy-Item target/release/stt_worker_cpu.exe "target/release/stt_worker_cuda-$triple.exe"
 
       # bundle.resources in tauri.conf.json points at the ~574 MB Whisper
       # model. That file is gitignored, so CI has nothing to satisfy the

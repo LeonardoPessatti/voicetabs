@@ -13,16 +13,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "stt_worker_cpu"
 path = "src/main.rs"
-required-features = []
-
-[[bin]]
-name = "stt_worker_cuda"
-path = "src/main.rs"
-required-features = ["cuda"]
-
-[features]
-default = []
-cuda = ["whisper-rs/cuda"]
 
 [dependencies]
 anyhow = "1"

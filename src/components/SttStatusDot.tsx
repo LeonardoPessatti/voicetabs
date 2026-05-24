@@ -4,6 +4,18 @@ import { SttStatus } from "../lib/tauri";
 
 type Props = { status: SttStatus };
 
+function prettyBackend(b: string): string {
+  // Phase 7 will add "openai"; map here so the UI doesn't show the raw key.
+  switch (b) {
+    case "cpu":
+      return "Local CPU";
+    case "openai":
+      return "OpenAI";
+    default:
+      return b;
+  }
+}
+
 export function SttStatusDot({ status }: Props) {
   const { t } = useTranslation();
   let cls = "stt-dot";
@@ -12,15 +24,15 @@ export function SttStatusDot({ status }: Props) {
   switch (status.state) {
     case "ready":
       cls += " stt-dot--ready";
-      title = `${t("stt.ready")} (${status.backend} · ${status.model_id})`;
+      title = `${t("stt.ready")} (${prettyBackend(status.backend)} · ${status.model_id})`;
       break;
     case "loading":
       cls += " stt-dot--loading";
-      title = `${t("stt.loading")} (${status.backend})`;
+      title = `${t("stt.loading")} (${prettyBackend(status.backend)})`;
       break;
     case "restarting":
       cls += " stt-dot--restarting";
-      title = `${t("stt.restarting")} (${status.backend})`;
+      title = `${t("stt.restarting")} (${prettyBackend(status.backend)})`;
       break;
     case "error":
       cls += " stt-dot--error";

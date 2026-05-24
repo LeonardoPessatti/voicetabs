@@ -1,8 +1,6 @@
-//! `stt_worker` entrypoint.
-//!
-//! Two binaries are produced from this same source file: `stt_worker_cpu.exe`
-//! (default features) and `stt_worker_cuda.exe` (`--features cuda`). The only
-//! observable difference is the `backend` field in the `ReadyMessage`.
+//! `stt_worker` entrypoint. Single CPU build. Phase 7 will introduce a
+//! cloud backend ("openai") in the main process directly, not via this
+//! subprocess — this binary stays Whisper-on-CPU only.
 
 use std::io::{stdin, stdout, BufReader, Write};
 use std::path::PathBuf;
@@ -12,9 +10,6 @@ use stt_worker::framing::{read_frame, write_frame};
 use stt_worker::protocol::{ReadyMessage, RequestHeader, ResponseMessage};
 use stt_worker::whisper::Engine;
 
-#[cfg(feature = "cuda")]
-const BACKEND_NAME: &str = "cuda";
-#[cfg(not(feature = "cuda"))]
 const BACKEND_NAME: &str = "cpu";
 
 #[derive(Debug)]

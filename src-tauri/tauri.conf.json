@@ -34,8 +34,7 @@
     "targets": ["nsis"],
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "externalBin": [
-      "../target/release/stt_worker_cpu",
-      "../target/release/stt_worker_cuda"
+      "../target/release/stt_worker_cpu"
     ],
     "resources": [
       "resources/ggml-small-q5_1.bin"

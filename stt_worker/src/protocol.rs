@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct ReadyMessage {
     pub ready: bool,
     pub model_id: String,
-    pub backend: String, // "cuda" | "cpu"
+    pub backend: String, // "cpu" only (Phase 7 cloud path doesn't use this subprocess)
 }
 
 /// Sent by the main process before each PCM payload.
@@ -77,12 +77,12 @@ mod tests {
         let m = ReadyMessage {
             ready: true,
             model_id: "ggml-large-v3-turbo-q5_0".into(),
-            backend: "cuda".into(),
+            backend: "cpu".into(),
         };
         let s = serde_json::to_string(&m).unwrap();
         let back: ReadyMessage = serde_json::from_str(&s).unwrap();
         assert!(back.ready);
-        assert_eq!(back.backend, "cuda");
+        assert_eq!(back.backend, "cpu");
     }
 
     #[test]

@@ -17,7 +17,6 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio::time::Duration;
 
 use crate::stt::client::{SttClient, SttClientError};
-use crate::stt::gpu::Backend;
 use crate::stt::protocol::TranscriptionResult;
 use crate::stt::status::{SttStatus, SttStatusHandle};
 
@@ -29,7 +28,10 @@ pub struct SupervisorConfig {
     pub worker_binary: PathBuf,
     pub model_path: PathBuf,
     pub language: String,
-    pub backend: Backend,
+    /// Free-form backend identifier published in `SttStatus`. Phase 7 will
+    /// introduce `"openai"`; today we always pass `"cpu"`. Keep as `String`
+    /// to avoid an enum refactor when the cloud backend lands.
+    pub backend: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -87,13 +89,13 @@ impl SttSupervisor {
     /// returns `Ok(())` even on spawn failure so the rest of the app can boot.
     pub async fn boot(&self) -> Result<(), SupervisorError> {
         self.inner.status.set(SttStatus::Loading {
-            backend: self.inner.cfg.backend.as_str().to_string(),
+            backend: self.inner.cfg.backend.clone(),
         });
         match self.spawn_and_handshake().await {
             Ok((child, client, model_id)) => {
                 *self.inner.client.lock().await = Some(client);
                 self.inner.status.set(SttStatus::Ready {
-                    backend: self.inner.cfg.backend.as_str().to_string(),
+                    backend: self.inner.cfg.backend.clone(),
                     model_id,
                 });
                 // Spawn the watcher in the background.
@@ -191,7 +193,7 @@ impl SttSupervisor {
 
             // Update status, then attempt respawn + replay.
             self.inner.status.set(SttStatus::Restarting {
-                backend: self.inner.cfg.backend.as_str().to_string(),
+                backend: self.inner.cfg.backend.clone(),
             });
             tokio::time::sleep(Duration::from_millis(RESPAWN_DELAY_MS)).await;
 
@@ -199,7 +201,7 @@ impl SttSupervisor {
                 Ok((new_child, new_client, model_id)) => {
                     *self.inner.client.lock().await = Some(new_client.clone());
                     self.inner.status.set(SttStatus::Ready {
-                        backend: self.inner.cfg.backend.as_str().to_string(),
+                        backend: self.inner.cfg.backend.clone(),
                         model_id,
                     });
                     // Replay last in-flight (one attempt).

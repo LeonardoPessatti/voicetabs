@@ -18,7 +18,6 @@ use tauri::{Emitter, Manager};
 use crate::capture::UtteranceFinalized;
 use crate::db::{segments as segments_repo, Db};
 use crate::hallucination::{evaluate, Decision, Input as HInput, Thresholds};
-use crate::stt::gpu::Backend;
 use crate::stt::status::SttStatus;
 use crate::stt::{SttStatusHandle, SttSupervisor, SupervisorConfig};
 use crate::vocab::build_initial_prompt;
@@ -42,11 +41,12 @@ pub fn run() {
     let capture = capture::CaptureController::spawn(audio_dir, db.clone(), active_tab.clone());
     let utt_rx = capture.utterance_receiver();
 
-    // GPU autodetect (sync; uses settings cache).
-    let backend = stt::gpu::detect_or_load(&db);
+    // Backend identifier published to the frontend via SttStatus. Hardcoded
+    // to "cpu" today; Phase 7 will add an "openai" alternative.
+    let backend = "cpu".to_string();
 
     let stt_status = SttStatusHandle::new(SttStatus::Loading {
-        backend: backend.as_str().to_string(),
+        backend: backend.clone(),
     });
     let stt_status_for_state = stt_status.clone();
 
@@ -77,32 +77,8 @@ pub fn run() {
             let app_handle = app.handle().clone();
             let model_path = resolve_model_path(&app_handle).expect("resolve model path");
             let worker_binary =
-                resolve_worker_binary(&app_handle, backend).expect("resolve worker binary");
+                resolve_worker_binary(&app_handle).expect("resolve worker binary");
 
-            // Sanity-check whether the on-disk CUDA binary is actually the
-            // CPU build copy (same bytes). If so, the worker WILL run on CPU
-            // regardless of the GPU probe verdict.
-            let worker_label = match backend {
-                Backend::Cuda => {
-                    let cpu_path = worker_binary
-                        .parent()
-                        .map(|p| p.join("stt_worker_cpu.exe"));
-                    let is_placeholder = cpu_path
-                        .as_ref()
-                        .and_then(|p| {
-                            let cuda_bytes = std::fs::metadata(&worker_binary).ok()?.len();
-                            let cpu_bytes = std::fs::metadata(p).ok()?.len();
-                            Some(cuda_bytes == cpu_bytes && cpu_bytes > 0)
-                        })
-                        .unwrap_or(false);
-                    if is_placeholder {
-                        "CUDA (probe) → actually CPU (binary is placeholder copy)"
-                    } else {
-                        "CUDA"
-                    }
-                }
-                Backend::Cpu => "CPU",
-            };
             let model_name = model_path
                 .file_name()
                 .and_then(|s| s.to_str())
@@ -113,26 +89,20 @@ pub fn run() {
             tracing::warn!(
                 "\n\
                 ═══════════════════════════════════════════════════════════════\n\
-                  STT BACKEND:   {}\n\
+                  STT BACKEND:   CPU (local)\n\
                   Worker binary: {}\n\
                   Model:         {} ({:.0} MB)\n\
-                  Expected speed: {}\n\
                 ═══════════════════════════════════════════════════════════════",
-                worker_label,
                 worker_binary.display(),
                 model_name,
                 model_size_mb,
-                match (backend, worker_label.contains("placeholder")) {
-                    (Backend::Cuda, false) => "FAST (~0.5-1s per utterance on GTX 1060)",
-                    _ => "SLOW (~5-30s per utterance on CPU, model-dependent)",
-                },
             );
 
             let cfg = SupervisorConfig {
                 worker_binary,
                 model_path,
                 language: "pt".into(),
-                backend,
+                backend: backend.clone(),
             };
             let supervisor = SttSupervisor::new(cfg, stt_status.clone());
             app.manage(supervisor.clone());
@@ -193,11 +163,7 @@ fn resolve_model_path(app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
     Ok(p)
 }
 
-fn resolve_worker_binary(_app: &tauri::AppHandle, backend: Backend) -> anyhow::Result<PathBuf> {
-    let name = match backend {
-        Backend::Cuda => "stt_worker_cuda",
-        Backend::Cpu => "stt_worker_cpu",
-    };
+fn resolve_worker_binary(_app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
     // In dev mode, the worker lives next to voicetabs.exe under target/.
     // In a bundled installer it lives in the resource dir as an externalBin.
     let candidates: Vec<PathBuf> = {
@@ -205,14 +171,14 @@ fn resolve_worker_binary(_app: &tauri::AppHandle, backend: Backend) -> anyhow::R
         // Bundled: alongside the main exe.
         if let Ok(exe) = std::env::current_exe() {
             if let Some(dir) = exe.parent() {
-                v.push(dir.join(format!("{name}.exe")));
+                v.push(dir.join("stt_worker_cpu.exe"));
             }
         }
         // Dev: cargo workspace target.
-        v.push(PathBuf::from(format!("../target/debug/{name}.exe")));
-        v.push(PathBuf::from(format!("../target/release/{name}.exe")));
-        v.push(PathBuf::from(format!("target/debug/{name}.exe")));
-        v.push(PathBuf::from(format!("target/release/{name}.exe")));
+        v.push(PathBuf::from("../target/debug/stt_worker_cpu.exe"));
+        v.push(PathBuf::from("../target/release/stt_worker_cpu.exe"));
+        v.push(PathBuf::from("target/debug/stt_worker_cpu.exe"));
+        v.push(PathBuf::from("target/release/stt_worker_cpu.exe"));
         v
     };
     for c in &candidates {
@@ -221,7 +187,7 @@ fn resolve_worker_binary(_app: &tauri::AppHandle, backend: Backend) -> anyhow::R
         }
     }
     Err(anyhow::anyhow!(
-        "could not locate {name}.exe; checked: {:?}",
+        "could not locate stt_worker_cpu.exe; checked: {:?}",
         candidates
     ))
 }
