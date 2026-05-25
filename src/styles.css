@@ -251,3 +251,12 @@ html, body, #root {
   font-size: 11px;
   margin-top: 4px;
 }
+
+.segment-card__timestamp {
+  display: block;
+  color: #888;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+  user-select: none;
+}

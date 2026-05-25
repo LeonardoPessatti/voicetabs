@@ -160,4 +160,47 @@ describe("SegmentCard", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /snapshot vocab|vocabulário original/i }));
     expect(onRetranscribe).toHaveBeenCalledWith(1, "snapshot");
   });
+
+  it("renders the segment timestamp as HH:MM:SS when showTimestamps is true", () => {
+    const seg = mkSegment("hi");
+    seg.started_at = Date.UTC(2026, 4, 23, 14, 7, 42); // May = month 4
+    render(
+      <SegmentCard
+        segment={seg}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+        showTimestamps
+      />,
+    );
+    const tag = document.querySelector("time");
+    expect(tag).not.toBeNull();
+    expect(tag!.getAttribute("datetime")).toBe(new Date(seg.started_at).toISOString());
+    expect(tag!.textContent).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("omits the timestamp when showTimestamps is false", () => {
+    render(
+      <SegmentCard
+        segment={mkSegment("hi")}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+        showTimestamps={false}
+      />,
+    );
+    expect(document.querySelector("time")).toBeNull();
+  });
+
+  it("defaults to NOT rendering the timestamp when prop is omitted", () => {
+    render(
+      <SegmentCard
+        segment={mkSegment("hi")}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    expect(document.querySelector("time")).toBeNull();
+  });
 });

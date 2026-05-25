@@ -12,6 +12,10 @@ type Props = {
   /** Optional: while the backend is re-transcribing this segment, show the
    *  inline "transcribing…" placeholder instead of the text. */
   isTranscribing?: boolean;
+  /** Optional: when true, render an HH:MM:SS timestamp above the segment
+   *  text. Defaults to false so callers that haven't been updated get the
+   *  safe behaviour (no timestamp) rather than a surprise UI change. */
+  showTimestamps?: boolean;
 };
 
 const DELETE_CONFIRM_THRESHOLD = 20;
@@ -22,6 +26,7 @@ export function SegmentCard({
   onDelete,
   onRetranscribe,
   isTranscribing,
+  showTimestamps,
 }: Props) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -87,6 +92,14 @@ export function SegmentCard({
   return (
     <article className="segment-card">
       <div className="segment-card__body">
+        {showTimestamps && !editing && (
+          <time
+            className="segment-card__timestamp"
+            dateTime={new Date(segment.started_at).toISOString()}
+          >
+            {formatTimestamp(segment.started_at)}
+          </time>
+        )}
         {editing ? (
           <textarea
             autoFocus
@@ -188,4 +201,22 @@ function audioDirHint(): string {
   // Use the literal env var. convertFileSrc on Tauri 2 + Windows
   // canonicalises this against the file system.
   return "%APPDATA%\\voicetabs\\audio";
+}
+
+/**
+ * Format a unix-ms timestamp as HH:MM:SS in the user's locale, 24-hour
+ * clock. We avoid `Date.toString` because that's implementation-defined and
+ * leaks the timezone abbreviation; `toLocaleTimeString` with `hour12: false`
+ * gives us a clean `HH:MM:SS`. The user's locale is whatever the browser/
+ * Tauri WebView2 reports — react-i18next's current locale matches because
+ * `document.documentElement.lang` is set on locale change.
+ */
+function formatTimestamp(unixMs: number): string {
+  const d = new Date(unixMs);
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
