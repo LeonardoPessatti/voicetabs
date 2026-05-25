@@ -169,3 +169,24 @@ export const captureModeApi = {
     await invoke("capture_set_mode", { mode });
   },
 };
+
+// --- Backend (STT) ---
+export type BackendKind = "local" | "openai";
+
+export const backendApi = {
+  get(): Promise<BackendKind> {
+    return invoke<BackendKind>("backend_get");
+  },
+  set(kind: BackendKind): Promise<void> {
+    return invoke<void>("backend_set", { kind });
+  },
+  openaiKeyStatus(): Promise<boolean> {
+    return invoke<boolean>("openai_key_status");
+  },
+  openaiKeySet(value: string): Promise<void> {
+    return invoke<void>("openai_key_set", { value });
+  },
+  openaiKeyClear(): Promise<void> {
+    return invoke<void>("openai_key_clear");
+  },
+};
