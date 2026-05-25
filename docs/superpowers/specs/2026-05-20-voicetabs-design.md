@@ -22,6 +22,15 @@ The full feature brief that produced this spec lives in chat history; relevant c
 
 Real-time / streaming transcription with token-by-token display, multiple-speaker diarization, cloud sync, accounts, sharing, audio-file imports, translation, mobile. **Single-user, single-machine, fully offline after first-run setup.**
 
+> **Phase 7 amendment (2026-05-23):** the "fully offline" property holds for the
+> default install. Phase 7 adds an **opt-in** cloud transcription backend
+> (OpenAI `gpt-4o-mini-transcribe`) that the user can select from the settings
+> drawer. When selected, per-utterance audio is uploaded to `api.openai.com`
+> over HTTPS; the API key is stored in the OS credential store and never
+> logged or persisted to SQLite. Local CPU transcription remains the default
+> and is fully unaffected. See
+> `docs/superpowers/plans/2026-05-23-voicetabs-phase-7-openai-backend.md`.
+
 ## 3. Quality bar & acceptance criteria
 
 | ID | Criterion |
