@@ -62,12 +62,12 @@ impl TrayHandle {
 
 fn load_idle_icon() -> tauri::Result<Image<'static>> {
     let bytes: &'static [u8] = include_bytes!("../../icons/tray-idle.png");
-    Image::from_bytes(bytes).map_err(Into::into)
+    Image::from_bytes(bytes)
 }
 
 fn load_capturing_icon() -> tauri::Result<Image<'static>> {
     let bytes: &'static [u8] = include_bytes!("../../icons/tray-capturing.png");
-    Image::from_bytes(bytes).map_err(Into::into)
+    Image::from_bytes(bytes)
 }
 
 pub fn toggle_main_window(app: &AppHandle) {

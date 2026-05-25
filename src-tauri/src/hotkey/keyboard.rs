@@ -20,11 +20,15 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutSt
 
 use super::{Binding, BindingError, HotkeyEvent};
 
+/// Sender slot armed by `start_capture`; the first key event consumed by
+/// the global-shortcut callback resolves to a `Binding` or `BindingError`.
+type CaptureSlot = Arc<Mutex<Option<Sender<Result<Binding, BindingError>>>>>;
+
 pub struct KeyboardBackend {
     app: AppHandle,
     event_tx: Sender<HotkeyEvent>,
     current: Arc<Mutex<Option<Shortcut>>>,
-    capture_tx: Arc<Mutex<Option<Sender<Result<Binding, BindingError>>>>>,
+    capture_tx: CaptureSlot,
 }
 
 impl KeyboardBackend {

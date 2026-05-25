@@ -26,11 +26,15 @@ enum MouseHookEvent {
 /// the hook thread is a singleton for the process lifetime.
 static HOOK_TX: OnceLock<Sender<MouseHookEvent>> = OnceLock::new();
 
+/// Sender slot armed by `start_capture`; the forwarder thread resolves it
+/// with a `Binding` (XBUTTON1/2 pressed) or `BindingError` (unsupported key).
+type CaptureSlot = std::sync::Arc<Mutex<Option<Sender<Result<Binding, BindingError>>>>>;
+
 pub struct MouseBackend {
     #[allow(dead_code)]
     event_tx: Sender<HotkeyEvent>,
     bound_button: std::sync::Arc<Mutex<Option<u16>>>,
-    capture_tx: std::sync::Arc<Mutex<Option<Sender<Result<Binding, BindingError>>>>>,
+    capture_tx: CaptureSlot,
 }
 
 impl MouseBackend {

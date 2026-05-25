@@ -10,17 +10,12 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CaptureMode {
+    #[default]
     AlwaysOn,
     Ptt,
-}
-
-impl Default for CaptureMode {
-    fn default() -> Self {
-        CaptureMode::AlwaysOn
-    }
 }
 
 impl CaptureMode {

@@ -107,6 +107,6 @@ mod tests {
         let s = a.snapshot();
         writer_handle.join().unwrap();
         let id = s.expect("never None after the initial set(1)");
-        assert!(id >= 1 && id <= 100, "torn read? got {id}");
+        assert!((1..=100).contains(&id), "torn read? got {id}");
     }
 }

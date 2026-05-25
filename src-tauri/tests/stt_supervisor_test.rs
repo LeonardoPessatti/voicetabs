@@ -9,13 +9,18 @@
 //! tests ran in parallel inside the same test binary.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+
+use tokio::sync::Mutex;
 
 // Backend was an enum from the removed stt::gpu module; backend is now a String.
 use voicetabs_lib::stt::status::SttStatus;
 use voicetabs_lib::stt::{SttStatusHandle, SttSupervisor, SupervisorConfig};
 
-static ENV_LOCK: Mutex<()> = Mutex::new(());
+// Async-aware mutex so the guard can be held across `.await` points without
+// tripping clippy's `await_holding_lock`. These tests must serialize because
+// they mutate `STUB_DIE_AFTER` / `STUB_DIE_MARKER` env vars, which would race
+// if the two tests ran in parallel inside the same test binary.
+static ENV_LOCK: Mutex<()> = Mutex::const_new(());
 
 fn stub_path() -> PathBuf {
     // The stub_worker binary is built alongside this test. Cargo places it in
@@ -52,7 +57,7 @@ fn ensure_marker_absent(marker: &Path) {
 
 #[tokio::test]
 async fn happy_path_transcribes_once() {
-    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = ENV_LOCK.lock().await;
     clear_stub_env();
 
     let cfg = make_cfg();
@@ -70,7 +75,7 @@ async fn happy_path_transcribes_once() {
 
 #[tokio::test]
 async fn worker_death_is_recovered_and_caller_succeeds_after_respawn() {
-    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = ENV_LOCK.lock().await;
 
     // The first stub child dies after one successful response and touches a
     // marker file. The respawned child sees the marker exists and stops

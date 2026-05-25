@@ -28,8 +28,8 @@ pub enum CaptureStatus {
 /// `vocab_snapshot`, `language`) alongside the WAV path + in-memory samples.
 /// The downstream async drainer in `lib.rs` consumes these, runs STT + RMS
 /// + the hallucination filter, then either inserts a segment row + emits
-/// `segment-created` or drops with a logged reason. The WAV remains on disk
-/// either way so dropped utterances are diagnosable.
+///   `segment-created` or drops with a logged reason. The WAV remains on disk
+///   either way so dropped utterances are diagnosable.
 #[derive(Debug, Clone)]
 pub struct UtteranceFinalized {
     pub audio_path: PathBuf,
