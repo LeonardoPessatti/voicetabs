@@ -14,12 +14,15 @@ pub mod vad;
 pub mod vocab;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tauri::{Emitter, Manager};
 
 use crate::capture::{CaptureController, CaptureStatus, UtteranceFinalized};
 use crate::db::{segments as segments_repo, Db};
 use crate::hallucination::{evaluate, Decision, Input as HInput, Thresholds};
+use crate::stt::active::{build_backend, ActiveBackend, BackendKind};
+use crate::stt::local::LocalSttBackend;
 use crate::stt::status::SttStatus;
 use crate::stt::{SttStatusHandle, SttSupervisor, SupervisorConfig};
 use crate::vocab::build_initial_prompt;
@@ -48,9 +51,18 @@ pub fn run() {
         load_capture_mode(&db).unwrap_or(capture::CaptureMode::AlwaysOn),
     );
 
-    // Backend identifier published to the frontend via SttStatus. Hardcoded
-    // to "cpu" today; Phase 7 will add an "openai" alternative.
-    let backend = "cpu".to_string();
+    // Initial backend kind comes from the persisted `stt_backend` setting.
+    // Missing/garbage values fall back to Local. The supervisor's identifier
+    // for Local stays "cpu" for telemetry symmetry with earlier phases.
+    let initial_kind: BackendKind = db::settings::get::<String>(&db, "stt_backend")
+        .ok()
+        .flatten()
+        .map(|s| BackendKind::from_setting(&s))
+        .unwrap_or(BackendKind::Local);
+    let backend = match initial_kind {
+        BackendKind::Local => "cpu".to_string(),
+        BackendKind::Openai => "openai".to_string(),
+    };
 
     let stt_status = SttStatusHandle::new(SttStatus::Loading {
         backend: backend.clone(),
@@ -93,6 +105,11 @@ pub fn run() {
             commands::hotkey::hotkey_clear_binding,
             commands::hotkey::hotkey_capture_next,
             commands::stt::stt_status,
+            commands::backend::backend_get,
+            commands::backend::backend_set,
+            commands::backend::openai_key_set,
+            commands::backend::openai_key_clear,
+            commands::backend::openai_key_status,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -184,10 +201,14 @@ pub fn run() {
             tracing::warn!(
                 "\n\
                 ═══════════════════════════════════════════════════════════════\n\
-                  STT BACKEND:   CPU (local)\n\
+                  STT BACKEND:   {}\n\
                   Worker binary: {}\n\
                   Model:         {} ({:.0} MB)\n\
                 ═══════════════════════════════════════════════════════════════",
+                match initial_kind {
+                    BackendKind::Local => "Local (CPU)",
+                    BackendKind::Openai => "OpenAI (cloud)",
+                },
                 worker_binary.display(),
                 model_name,
                 model_size_mb,
@@ -201,6 +222,27 @@ pub fn run() {
             };
             let supervisor = SttSupervisor::new(cfg, stt_status.clone());
             app.manage(supervisor.clone());
+
+            // Wrap supervisor in LocalSttBackend (the SttBackend impl for
+            // local subprocess), then seed ActiveBackend with whatever
+            // initial_kind asked for. If the OpenAI key isn't configured
+            // (or selection fails for any reason) we fall back to local
+            // and log a warning — the user can swap from the UI later.
+            let local_backend: Arc<LocalSttBackend> =
+                Arc::new(LocalSttBackend::new(supervisor.clone()));
+            let initial_arc: Arc<dyn crate::stt::backend::SttBackend> =
+                match build_backend(initial_kind, local_backend.clone()) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        tracing::warn!(
+                            "initial backend build failed ({e}); falling back to local"
+                        );
+                        local_backend.clone()
+                    }
+                };
+            let active = ActiveBackend::new(initial_arc);
+            app.manage(active.clone());
+            app.manage(local_backend.clone());
 
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -222,12 +264,22 @@ pub fn run() {
 
             // Drainer: consume utterances, run STT + RMS + hallucination
             // filter, insert kept segments into the DB, and emit
-            // `segment-created` to the frontend.
+            // `segment-created` to the frontend. Routes transcribe calls
+            // through `ActiveBackend` so a backend swap from the UI takes
+            // effect on the next utterance.
             let sup_for_drainer = supervisor.clone();
+            let active_for_drainer = active.clone();
             let app_for_drainer = app_handle.clone();
             let db_for_drainer = db.clone();
             rt.spawn(async move {
-                drain_utterances(utt_rx, sup_for_drainer, app_for_drainer, db_for_drainer).await;
+                drain_utterances(
+                    utt_rx,
+                    sup_for_drainer,
+                    active_for_drainer,
+                    app_for_drainer,
+                    db_for_drainer,
+                )
+                .await;
             });
 
             Ok(())
@@ -296,6 +348,7 @@ fn resolve_worker_binary(_app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
 async fn drain_utterances(
     utt_rx: crossbeam_channel::Receiver<UtteranceFinalized>,
     sup: SttSupervisor,
+    active: ActiveBackend,
     app: tauri::AppHandle,
     db: Db,
 ) {
@@ -330,22 +383,26 @@ async fn drain_utterances(
             u.start_tab_id,
         );
         let sup = sup.clone();
+        let active = active.clone();
         let app = app.clone();
         let db = db.clone();
         // Spawn per-utterance so a slow transcription doesn't block the queue.
         tokio::spawn(async move {
-            run_segment_pipeline(u, sup, app, db).await;
+            run_segment_pipeline(u, sup, active, app, db).await;
         });
     }
     tracing::warn!("drain_utterances: async receiver closed, exiting");
 }
 
 /// The Phase-4 finalize → STT → RMS → filter → insert → emit pipeline. Lives
-/// in `lib.rs` rather than `controller.rs` because `SttSupervisor::transcribe`
-/// is async and the controller worker is a sync `std::thread`.
+/// in `lib.rs` rather than `controller.rs` because `SttBackend::transcribe`
+/// is async and the controller worker is a sync `std::thread`. Routes
+/// through `ActiveBackend` so backend swaps from the UI take effect on the
+/// next utterance.
 async fn run_segment_pipeline(
     u: UtteranceFinalized,
     sup: SttSupervisor,
+    active: ActiveBackend,
     app: tauri::AppHandle,
     db: Db,
 ) {
@@ -370,25 +427,28 @@ async fn run_segment_pipeline(
         rms_dbfs,
     );
 
-    // 2. Build initial_prompt and call STT.
+    // 2. Build initial_prompt and call STT through the active backend.
     let initial_prompt = build_initial_prompt(&vocab_snapshot, &language);
     let request_id = uuid::Uuid::new_v4().to_string();
+    // Snapshot the active backend BEFORE awaiting transcribe so a
+    // mid-call swap doesn't kill this one.
+    let backend = active.snapshot().await;
     tracing::info!(
-        "segment_pipeline: calling supervisor.transcribe request_id={} initial_prompt={:?}",
+        "segment_pipeline: calling {}.transcribe request_id={} initial_prompt={:?}",
+        backend.backend_id(),
         request_id,
         initial_prompt,
     );
-    let result = match sup
-        .transcribe(
-            request_id.clone(),
-            samples,
-            &language,
-            &initial_prompt,
-            Some(audio_path.clone()),
-            started_at_ms,
-        )
-        .await
-    {
+    let req = crate::stt::backend::TranscribeRequest {
+        request_id: request_id.clone(),
+        samples,
+        sample_rate: 16_000,
+        language: language.clone(),
+        initial_prompt: initial_prompt.clone(),
+        audio_path: Some(audio_path.clone()),
+        started_at_ms,
+    };
+    let result = match backend.transcribe(req).await {
         Ok(r) => {
             tracing::info!(
                 "segment_pipeline: transcribe OK request_id={} text={:?} no_speech_prob={:.3} avg_logprob={:.3} duration_ms={}",
@@ -450,14 +510,19 @@ async fn run_segment_pipeline(
         serde_json::to_string(&vocab_snapshot).unwrap_or_else(|_| "[]".into());
     let duration_ms = ended_at_ms.saturating_sub(started_at_ms) as i64;
 
-    // The supervisor's TranscriptionResult does not carry model_id (the
-    // worker reports it once at handshake via ReadyMessage). Pull it from
-    // the SttStatusHandle, which the supervisor publishes into on every
-    // (re)boot. If the worker isn't Ready right now (shouldn't happen after
+    // For OpenAI we trust the backend's static model_id (`gpt-4o-mini-transcribe`).
+    // For Local the supervisor's TranscriptionResult does not carry model_id
+    // (the worker reports it once at handshake via ReadyMessage), so we
+    // read it from the SttStatusHandle which the supervisor publishes into
+    // on every (re)boot. If the worker isn't Ready (shouldn't happen after
     // a successful transcribe, but be defensive), fall back to a literal.
-    let model_id = match sup.status_handle().get() {
-        SttStatus::Ready { model_id, .. } => model_id,
-        _ => "unknown".into(),
+    let model_id = if backend.backend_id() == "openai" {
+        backend.model_id().to_string()
+    } else {
+        match sup.status_handle().get() {
+            SttStatus::Ready { model_id, .. } => model_id,
+            _ => "unknown".into(),
+        }
     };
 
     let new = segments_repo::NewSegment {

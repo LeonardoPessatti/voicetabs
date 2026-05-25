@@ -5,6 +5,7 @@ use tauri::State;
 
 use crate::db::{segments as repo, settings as settings_repo, Db};
 use crate::paths;
+use crate::stt::active::ActiveBackend;
 use crate::stt::status::{SttStatus, SttStatusHandle};
 use crate::stt::SttSupervisor;
 use crate::vocab::build_initial_prompt;
@@ -99,13 +100,15 @@ pub async fn segments_retranscribe(
     db: State<'_, Db>,
     stt: State<'_, SttSupervisor>,
     stt_status: State<'_, SttStatusHandle>,
+    active: State<'_, ActiveBackend>,
 ) -> Result<RetranscribeResult, CommandError> {
     // Clone every State value up front. We do not hold any `State<'_, …>`
     // borrow across `.await`, which keeps the future `Send` and avoids
     // lifetime issues with Tauri's borrow-checking on async commands.
     let db = db.inner().clone();
-    let supervisor = stt.inner().clone();
+    let _supervisor = stt.inner().clone();
     let stt_status = stt_status.inner().clone();
+    let active = active.inner().clone();
 
     let segment = repo::get_by_id(&db, id)?;
 
@@ -142,30 +145,36 @@ pub async fn segments_retranscribe(
 
     let request_id = uuid::Uuid::new_v4().to_string();
     let started_at_ms = u64::try_from(segment.started_at).unwrap_or(0);
-    let result = supervisor
-        .transcribe(
+    // Route through ActiveBackend so the current selection (local vs. openai)
+    // is honored. Snapshot before awaiting to avoid blocking a swap that
+    // may land mid-call.
+    let backend = active.snapshot().await;
+    let result = backend
+        .transcribe(crate::stt::backend::TranscribeRequest {
             request_id,
             samples,
-            &language,
-            &initial_prompt,
-            Some(full.clone()),
+            sample_rate: 16_000,
+            language: language.clone(),
+            initial_prompt,
+            audio_path: Some(full.clone()),
             started_at_ms,
-        )
+        })
         .await
         .map_err(|e| CommandError {
             code: "STT_ERROR".into(),
             message: e.to_string(),
         })?;
 
-    // The supervisor's TranscriptionResult does not carry model_id (the worker
-    // reports it once at handshake via ReadyMessage). Pull it from the
-    // SttStatusHandle, which the supervisor publishes into on every (re)boot.
-    let model_id = match stt_status.get() {
-        SttStatus::Ready { model_id, .. } => model_id,
-        // If the worker is in another state (loading/restarting/error) we
-        // shouldn't have gotten a successful transcribe above, but defend
-        // anyway: preserve the previous model_id stored on the segment.
-        _ => segment.model_id.clone(),
+    // For OpenAI the backend exposes a static model_id. For Local the
+    // supervisor's TranscriptionResult does not carry model_id, so we read
+    // from the SttStatusHandle (published on every supervisor (re)boot).
+    let model_id = if backend.backend_id() == "openai" {
+        backend.model_id().to_string()
+    } else {
+        match stt_status.get() {
+            SttStatus::Ready { model_id, .. } => model_id,
+            _ => segment.model_id.clone(),
+        }
     };
 
     // 4. Persist.
