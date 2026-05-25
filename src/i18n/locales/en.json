@@ -33,7 +33,20 @@
     "hotkeyNone": "None",
     "hotkeyBind": "Bind",
     "hotkeyCapturing": "Press any key or button…",
-    "hotkeyCancel": "Cancel"
+    "hotkeyCancel": "Cancel",
+    "backend": {
+      "heading": "Transcription backend",
+      "local": "Local (CPU)",
+      "openai": "OpenAI (cloud)",
+      "apiKey": "OpenAI API key",
+      "apiKeyPlaceholder": "sk-…",
+      "save": "Save key",
+      "clear": "Clear key",
+      "configured": "Key configured ✓",
+      "notConfigured": "No key configured",
+      "disclaimer": "Audio is sent to api.openai.com. See OpenAI's privacy policy.",
+      "errorNoKey": "Set the OpenAI key before selecting this backend."
+    }
   },
   "capture": {
     "modeAlwaysOn": "Always on",

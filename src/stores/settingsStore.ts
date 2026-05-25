@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { settingsApi } from "../lib/tauri";
+import { backendApi, BackendKind, settingsApi } from "../lib/tauri";
 import i18n, { SupportedLocale, SUPPORTED_LOCALES } from "../i18n";
 
 const LOCALE_KEY = "ui_locale";
@@ -12,11 +12,16 @@ type SettingsState = {
   drawerOpen: boolean;
   vocabTerms: string[];
   showTimestamps: boolean;
+  backend: BackendKind;
+  openaiKeySet: boolean;
 
   load: () => Promise<void>;
   setLocale: (locale: SupportedLocale) => Promise<void>;
   setVocabTerms: (terms: string[]) => Promise<void>;
   setShowTimestamps: (value: boolean) => Promise<void>;
+  setBackend: (kind: BackendKind) => Promise<void>;
+  saveOpenAiKey: (value: string) => Promise<void>;
+  clearOpenAiKey: () => Promise<void>;
   openDrawer: () => void;
   closeDrawer: () => void;
 };
@@ -26,6 +31,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   drawerOpen: false,
   vocabTerms: [],
   showTimestamps: true,
+  backend: "local",
+  openaiKeySet: false,
 
   async load() {
     const stored = await settingsApi.get(LOCALE_KEY);
@@ -57,7 +64,12 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     const tsRaw = await settingsApi.get(TIMESTAMPS_KEY);
     const showTimestamps = tsRaw === null ? true : tsRaw !== "false";
 
-    set({ uiLocale, vocabTerms, showTimestamps });
+    const [backend, openaiKeySet] = await Promise.all([
+      backendApi.get(),
+      backendApi.openaiKeyStatus(),
+    ]);
+
+    set({ uiLocale, vocabTerms, showTimestamps, backend, openaiKeySet });
   },
 
   async setLocale(locale) {
@@ -76,6 +88,23 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   async setShowTimestamps(value) {
     await settingsApi.set(TIMESTAMPS_KEY, value ? "true" : "false");
     set({ showTimestamps: value });
+  },
+
+  async setBackend(kind) {
+    await backendApi.set(kind);
+    set({ backend: kind });
+  },
+
+  async saveOpenAiKey(value) {
+    await backendApi.openaiKeySet(value);
+    set({ openaiKeySet: true });
+  },
+
+  async clearOpenAiKey() {
+    await backendApi.openaiKeyClear();
+    // The backend command auto-reverts to local when clearing while openai is active.
+    const backend = await backendApi.get();
+    set({ openaiKeySet: false, backend });
   },
 
   openDrawer() {

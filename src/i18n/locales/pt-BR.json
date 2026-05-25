@@ -33,7 +33,20 @@
     "hotkeyNone": "Nenhum",
     "hotkeyBind": "Vincular",
     "hotkeyCapturing": "Pressione qualquer tecla ou botão…",
-    "hotkeyCancel": "Cancelar"
+    "hotkeyCancel": "Cancelar",
+    "backend": {
+      "heading": "Backend de transcrição",
+      "local": "Local (CPU)",
+      "openai": "OpenAI (cloud)",
+      "apiKey": "Chave da API OpenAI",
+      "apiKeyPlaceholder": "sk-…",
+      "save": "Salvar chave",
+      "clear": "Limpar chave",
+      "configured": "Chave configurada ✓",
+      "notConfigured": "Nenhuma chave configurada",
+      "disclaimer": "Áudio enviado para api.openai.com. Veja a política de privacidade da OpenAI.",
+      "errorNoKey": "Configure a chave da OpenAI antes de selecionar este backend."
+    }
   },
   "capture": {
     "modeAlwaysOn": "Sempre ativo",
