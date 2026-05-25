@@ -25,6 +25,8 @@ export default function App() {
       await settings.load();
       await tabs.load();
       await capture.refresh();
+      await capture.loadMode();
+      await capture.loadBinding();
       capture.startPolling();
       await stt.refresh();
       stt.startPolling();
