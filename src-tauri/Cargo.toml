@@ -42,6 +42,7 @@ windows = { version = "0.58", features = [
 keyring = "3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 secrecy = "0.10"
+async-trait = "0.1"
 
 [dev-dependencies]
 tempfile = "3"
