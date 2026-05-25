@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useSettingsStore } from "../stores/settingsStore";
 import { SupportedLocale } from "../i18n";
+import { CaptureSettings } from "./CaptureSettings";
 import { VocabSettings } from "./VocabSettings";
 
 export function SettingsDrawer() {
@@ -30,6 +31,7 @@ export function SettingsDrawer() {
           </select>
         </section>
 
+        <CaptureSettings />
         <VocabSettings />
       </aside>
     </div>
