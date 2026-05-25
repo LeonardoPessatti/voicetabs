@@ -3,6 +3,7 @@ pub mod client;
 pub mod framing;
 pub mod keyring;
 pub mod local;
+pub mod openai;
 pub mod protocol;
 pub mod status;
 pub mod supervisor;

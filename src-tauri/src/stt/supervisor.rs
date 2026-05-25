@@ -64,7 +64,12 @@ struct InFlight {
     request_id: String,
     samples: Vec<f32>,
     initial_prompt: String,
+    // Carried for symmetry with `TranscribeRequest`; not read by replay
+    // (the worker re-derives them from the samples). Kept so a future
+    // change can pass them through without an API churn.
+    #[allow(dead_code)]
     audio_path: Option<PathBuf>,
+    #[allow(dead_code)]
     started_at_ms: u64,
 }
 
