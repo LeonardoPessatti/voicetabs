@@ -1,3 +1,4 @@
+pub mod backend;
 pub mod capture;
 pub mod hotkey;
 pub mod segments;
