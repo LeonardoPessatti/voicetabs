@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod hotkey;
 pub mod segments;
 pub mod settings;
 pub mod stt;

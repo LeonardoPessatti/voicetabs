@@ -86,6 +86,12 @@ pub fn run() {
             commands::capture::capture_start,
             commands::capture::capture_stop,
             commands::capture::capture_status,
+            commands::capture::capture_get_mode,
+            commands::capture::capture_set_mode,
+            commands::hotkey::hotkey_get_binding,
+            commands::hotkey::hotkey_set_binding,
+            commands::hotkey::hotkey_clear_binding,
+            commands::hotkey::hotkey_capture_next,
             commands::stt::stt_status,
         ])
         .setup(move |app| {

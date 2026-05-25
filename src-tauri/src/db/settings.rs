@@ -49,6 +49,11 @@ pub fn set<T: Serialize>(db: &Db, key: &str, value: &T) -> Result<(), SettingsEr
     set_raw(db, key, &encoded)
 }
 
+pub fn delete(db: &Db, key: &str) -> Result<(), SettingsError> {
+    db.with(|c| c.execute("DELETE FROM settings WHERE key = ?", [key]))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
