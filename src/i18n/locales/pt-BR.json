@@ -20,7 +20,16 @@
     "close": "Fechar",
     "vocabHeading": "Vocabulário",
     "vocabHint": "Um termo por linha. Termos vão para o prompt da transcrição.",
-    "vocabPlaceholder": "Digite os termos…"
+    "vocabPlaceholder": "Digite os termos…",
+    "captureHeading": "Captura",
+    "captureMode": "Modo",
+    "captureModeAlwaysOn": "Sempre ativo",
+    "captureModePtt": "Push-to-talk",
+    "hotkey": "Atalho",
+    "hotkeyNone": "Nenhum",
+    "hotkeyBind": "Vincular",
+    "hotkeyCapturing": "Pressione qualquer tecla ou botão…",
+    "hotkeyCancel": "Cancelar"
   },
   "capture": {
     "modeAlwaysOn": "Sempre ativo",
@@ -50,5 +59,14 @@
     "loading": "Carregando modelo",
     "restarting": "Reiniciando",
     "error": "Erro"
+  },
+  "tray": {
+    "show": "Mostrar VoiceTabs",
+    "hide": "Ocultar VoiceTabs",
+    "captureOn": "Captura: ligada",
+    "captureOff": "Captura: desligada",
+    "modeAlwaysOn": "Modo: sempre ativo",
+    "modePtt": "Modo: push-to-talk",
+    "quit": "Sair"
   }
 }

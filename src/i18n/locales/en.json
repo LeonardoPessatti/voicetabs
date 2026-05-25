@@ -20,7 +20,16 @@
     "close": "Close",
     "vocabHeading": "Vocabulary",
     "vocabHint": "One term per line. Terms are added to the transcription prompt.",
-    "vocabPlaceholder": "Enter terms…"
+    "vocabPlaceholder": "Enter terms…",
+    "captureHeading": "Capture",
+    "captureMode": "Mode",
+    "captureModeAlwaysOn": "Always on",
+    "captureModePtt": "Push-to-talk",
+    "hotkey": "Hotkey",
+    "hotkeyNone": "None",
+    "hotkeyBind": "Bind",
+    "hotkeyCapturing": "Press any key or button…",
+    "hotkeyCancel": "Cancel"
   },
   "capture": {
     "modeAlwaysOn": "Always on",
@@ -50,5 +59,14 @@
     "loading": "Loading model",
     "restarting": "Restarting",
     "error": "Error"
+  },
+  "tray": {
+    "show": "Show VoiceTabs",
+    "hide": "Hide VoiceTabs",
+    "captureOn": "Capture: on",
+    "captureOff": "Capture: off",
+    "modeAlwaysOn": "Mode: always on",
+    "modePtt": "Mode: push-to-talk",
+    "quit": "Quit"
   }
 }
