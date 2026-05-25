@@ -63,6 +63,21 @@ html, body, #root {
   font-size: 14px;
 }
 
+.tab__count {
+  display: inline-block;
+  background: #2a2a2a;
+  color: #cfcfcf;
+  border-radius: 10px;
+  font-size: 10px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.tab--active .tab__count {
+  background: #3b82f6;
+  color: #fff;
+}
+
 .tab__close:hover {
   color: #fff;
 }

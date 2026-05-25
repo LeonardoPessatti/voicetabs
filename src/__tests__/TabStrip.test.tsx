@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { TabStrip } from "../components/TabStrip";
-import { Tab } from "../lib/tauri";
+import { Tab, Segment } from "../lib/tauri";
+import { useSegmentsStore } from "../stores/segmentsStore";
 
 const tab = (id: number, title: string, order_idx: number): Tab => ({
   id,
@@ -10,6 +11,32 @@ const tab = (id: number, title: string, order_idx: number): Tab => ({
   order_idx,
   created_at: 0,
   updated_at: 0,
+});
+
+function stubSegment(id: number, tab_id: number): Segment {
+  return {
+    id,
+    tab_id,
+    position: id,
+    text: "x",
+    original_text: "x",
+    audio_path: `${id}.wav`,
+    started_at: 0,
+    ended_at: 0,
+    duration_ms: 0,
+    vocab_snapshot: "[]",
+    avg_logprob: 0,
+    no_speech_prob: 0,
+    model_id: "m",
+  };
+}
+
+beforeEach(() => {
+  useSegmentsStore.setState({
+    segmentsByTab: {},
+    loading: {},
+    unlistenSegmentCreated: null,
+  });
 });
 
 describe("TabStrip", () => {
@@ -62,6 +89,31 @@ describe("TabStrip", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: /Beta/ }));
     expect(onSelect).toHaveBeenCalledWith(2);
+  });
+
+  it("renders a segment count badge next to tabs with segments", () => {
+    useSegmentsStore.setState({
+      segmentsByTab: {
+        1: [stubSegment(1, 1), stubSegment(2, 1), stubSegment(3, 1)],
+        2: [],
+      },
+      loading: {},
+      unlistenSegmentCreated: null,
+    });
+    render(
+      <TabStrip
+        tabs={[tab(1, "A", 0), tab(2, "B", 1)]}
+        activeId={1}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onRename={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    );
+    expect(screen.getByText("3")).toBeInTheDocument();
+    // Tab B has 0 segments → no badge text.
+    expect(screen.queryByText("0")).toBeNull();
   });
 
   it("fires onCreate when clicking the + button", () => {

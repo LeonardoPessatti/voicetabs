@@ -17,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Tab } from "../lib/tauri";
+import { useSegmentsStore } from "../stores/segmentsStore";
 
 type Props = {
   tabs: Tab[];
@@ -40,6 +41,7 @@ function SortableTab(props: {
   beginRename: () => void;
   onClose: () => void;
   closeLabel: string;
+  segmentCount: number;
 }) {
   const {
     attributes,
@@ -86,6 +88,14 @@ function SortableTab(props: {
       ) : (
         <span className="tab__title">{props.tab.title}</span>
       )}
+      {props.segmentCount > 0 && (
+        <span
+          className="tab__count"
+          aria-label={`${props.segmentCount} segments`}
+        >
+          {props.segmentCount}
+        </span>
+      )}
       <button
         className="tab__close"
         aria-label={props.closeLabel}
@@ -113,6 +123,7 @@ export function TabStrip({
   const { t } = useTranslation();
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const segmentsByTab = useSegmentsStore((s) => s.segmentsByTab);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -154,6 +165,7 @@ export function TabStrip({
               }}
               onClose={() => onClose(tab.id)}
               closeLabel={t("tabs.close")}
+              segmentCount={(segmentsByTab[tab.id] ?? []).length}
             />
           ))}
         </SortableContext>
