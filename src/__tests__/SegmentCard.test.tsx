@@ -5,8 +5,13 @@ vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (p: string) => `asset://localhost/${encodeURIComponent(p)}`,
 }));
 
+vi.mock("../lib/clipboard", () => ({
+  writeText: vi.fn(async () => {}),
+}));
+
 import { SegmentCard } from "../components/SegmentCard";
 import { Segment } from "../lib/tauri";
+import { writeText as clipboardWriteText } from "../lib/clipboard";
 
 function mkSegment(text = "Hello world", id = 1): Segment {
   return {
@@ -202,5 +207,36 @@ describe("SegmentCard", () => {
       />,
     );
     expect(document.querySelector("time")).toBeNull();
+  });
+
+  it("Copy button writes segment.text to the clipboard", async () => {
+    (clipboardWriteText as ReturnType<typeof vi.fn>).mockClear();
+    render(
+      <SegmentCard
+        segment={mkSegment("hello clipboard")}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^copy segment$|^copiar segmento$/i }));
+    expect(clipboardWriteText).toHaveBeenCalledWith("hello clipboard");
+  });
+
+  it("Copy button shows the 'Copied!' confirmation, then hides it", async () => {
+    render(
+      <SegmentCard
+        segment={mkSegment("x")}
+        onEdit={noop}
+        onDelete={noop}
+        onRetranscribe={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^copy segment$|^copiar segmento$/i }));
+    // Wait for async clipboard.writeText to resolve and state to update.
+    expect(await screen.findByText(/copied!|copiado!/i)).toBeInTheDocument();
+    // The auto-hide setTimeout (1200 ms) fires under real timers.
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(screen.queryByText(/copied!|copiado!/i)).toBeNull();
   });
 });

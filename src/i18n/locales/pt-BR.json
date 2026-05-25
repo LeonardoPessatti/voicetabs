@@ -54,7 +54,9 @@
     "retranscribeSnapshot": "Re-transcrever (vocabulário original)",
     "retranscribing": "Transcrevendo…",
     "emptyState": "Fale algo para começar.",
-    "transcribingPlaceholder": "transcrevendo…"
+    "transcribingPlaceholder": "transcrevendo…",
+    "copy": "Copiar segmento",
+    "copied": "Copiado!"
   },
   "stt": {
     "ready": "Pronto",

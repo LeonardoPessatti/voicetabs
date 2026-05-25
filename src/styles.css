@@ -260,3 +260,22 @@ html, body, #root {
   margin-bottom: 4px;
   user-select: none;
 }
+
+.segment-card__copy {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.segment-card:hover .segment-card__copy,
+.segment-card:focus-within .segment-card__copy {
+  opacity: 1;
+}
+.segment-card__copied {
+  font-size: 11px;
+  color: #6bd16b;
+  margin-left: 8px;
+  animation: fadeout 1200ms ease forwards;
+}
+@keyframes fadeout {
+  0%, 70% { opacity: 1; }
+  100%    { opacity: 0; }
+}

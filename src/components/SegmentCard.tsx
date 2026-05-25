@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { RetranscribeMode, Segment } from "../lib/tauri";
+import { writeText } from "../lib/clipboard";
 
 type Props = {
   segment: Segment;
@@ -33,11 +34,26 @@ export function SegmentCard({
   const [draft, setDraft] = useState(segment.text);
   const [menuOpen, setMenuOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [justCopied, setJustCopied] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!editing) setDraft(segment.text);
   }, [editing, segment.text]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    await writeText(segment.text);
+    setJustCopied(true);
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = window.setTimeout(() => setJustCopied(false), 1200);
+  }
 
   // Build the audio src using Tauri's convertFileSrc. The audio file lives
   // at %APPDATA%\voicetabs\audio\<audio_path>. We use the asset protocol
@@ -134,6 +150,18 @@ export function SegmentCard({
             >
               {playing ? "❚❚" : "▶"}
             </button>
+            <button
+              className="segment-card__copy"
+              aria-label={t("segments.copy")}
+              onClick={() => void handleCopy()}
+            >
+              {"⧉"}
+            </button>
+            {justCopied && (
+              <span className="segment-card__copied" role="status" aria-live="polite">
+                {t("segments.copied")}
+              </span>
+            )}
             <button
               className="segment-card__edit"
               aria-label={t("segments.edit")}

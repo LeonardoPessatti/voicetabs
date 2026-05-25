@@ -54,7 +54,9 @@
     "retranscribeSnapshot": "Re-transcribe (snapshot vocab)",
     "retranscribing": "Transcribing…",
     "emptyState": "Speak to get started.",
-    "transcribingPlaceholder": "transcribing…"
+    "transcribingPlaceholder": "transcribing…",
+    "copy": "Copy segment",
+    "copied": "Copied!"
   },
   "stt": {
     "ready": "Ready",
