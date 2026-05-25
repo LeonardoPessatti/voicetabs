@@ -21,6 +21,8 @@
     "vocabHeading": "Vocabulary",
     "vocabHint": "One term per line. Terms are added to the transcription prompt.",
     "vocabPlaceholder": "Enter terms…",
+    "vocabAddChipHint": "Press Enter or comma to add.",
+    "vocabRemoveChip": "Remove {{term}}",
     "showTimestamps": "Show timestamps",
     "showTimestampsHint": "Show the time on each segment card.",
     "captureHeading": "Capture",

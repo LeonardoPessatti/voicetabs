@@ -27,28 +27,56 @@ beforeEach(() => {
 });
 
 describe("VocabSettings", () => {
-  it("renders the persisted vocab terms in the textarea", () => {
-    useSettingsStore.setState({ vocabTerms: ["foo", "bar"] });
+  it("renders existing terms as chips", () => {
+    useSettingsStore.setState({ vocabTerms: ["alpha", "beta"] });
     render(<VocabSettings />);
-    expect(screen.getByRole("textbox")).toHaveValue("foo\nbar");
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.getByText("beta")).toBeInTheDocument();
   });
 
-  it("persists trimmed non-empty lines on blur", () => {
+  it("adds a new chip on Enter and persists", () => {
     render(<VocabSettings />);
-    const textarea = screen.getByRole("textbox");
-    fireEvent.change(textarea, { target: { value: "  alpha\n\n beta \n" } });
-    fireEvent.blur(textarea);
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "gamma" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(settingsSet).toHaveBeenCalledWith({
       key: "vocab_terms",
-      value: JSON.stringify(["alpha", "beta"]),
+      value: JSON.stringify(["gamma"]),
     });
   });
 
-  it("does not call set if the value is unchanged after blur", () => {
-    useSettingsStore.setState({ vocabTerms: ["x"] });
+  it("adds a new chip on comma and persists", () => {
     render(<VocabSettings />);
-    const textarea = screen.getByRole("textbox");
-    fireEvent.blur(textarea); // no edit
-    expect(settingsSet).not.toHaveBeenCalled();
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "delta," } });
+    // Implementations may split on comma in onChange OR onKeyDown; the
+    // assertion only requires that the chip ultimately lands.
+    expect(settingsSet).toHaveBeenCalledWith({
+      key: "vocab_terms",
+      value: JSON.stringify(["delta"]),
+    });
+  });
+
+  it("removes a chip on its × button", () => {
+    useSettingsStore.setState({ vocabTerms: ["alpha", "beta"] });
+    render(<VocabSettings />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /remove alpha|remover alpha/i }),
+    );
+    expect(settingsSet).toHaveBeenCalledWith({
+      key: "vocab_terms",
+      value: JSON.stringify(["beta"]),
+    });
+  });
+
+  it("Backspace on empty input removes the last chip", () => {
+    useSettingsStore.setState({ vocabTerms: ["alpha", "beta"] });
+    render(<VocabSettings />);
+    const input = screen.getByRole("textbox");
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(settingsSet).toHaveBeenCalledWith({
+      key: "vocab_terms",
+      value: JSON.stringify(["alpha"]),
+    });
   });
 });
