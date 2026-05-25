@@ -57,6 +57,8 @@
     "transcribingPlaceholder": "transcribing…",
     "copy": "Copy segment",
     "copied": "Copied!",
+    "copyTab": "Copy tab",
+    "newTranscriptionPill": "New transcription ↓",
     "emptyHint": "Start speaking to transcribe."
   },
   "stt": {

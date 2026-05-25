@@ -57,6 +57,8 @@
     "transcribingPlaceholder": "transcrevendo…",
     "copy": "Copiar segmento",
     "copied": "Copiado!",
+    "copyTab": "Copiar aba",
+    "newTranscriptionPill": "Nova transcrição ↓",
     "emptyHint": "Comece a falar para transcrever."
   },
   "stt": {
