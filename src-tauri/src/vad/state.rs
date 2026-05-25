@@ -86,6 +86,15 @@ impl VadStateMachine {
         self.above_count = 0;
         self.below_count = 0;
     }
+
+    /// Force the state machine into Speaking and clear counters. Used in PTT
+    /// mode so VAD-driven FallingEdges are suppressed and the controller is
+    /// the one deciding when an utterance ends.
+    pub fn force_speaking(&mut self) {
+        self.state = VadState::Speaking;
+        self.above_count = 0;
+        self.below_count = 0;
+    }
 }
 
 #[cfg(test)]
@@ -167,6 +176,19 @@ mod tests {
         // Now another short silence; should NOT immediately fire falling edge
         // because the silence streak restarted from zero.
         let events = observe_n(&mut sm, 0.05, 10);
+        assert!(events.is_empty(), "got {events:?}");
+        assert_eq!(sm.state(), VadState::Speaking);
+    }
+
+    #[test]
+    fn force_speaking_jumps_to_speaking_with_no_event() {
+        let mut sm = VadStateMachine::new(CHUNK_MS);
+        assert_eq!(sm.state(), VadState::Idle);
+        sm.force_speaking();
+        assert_eq!(sm.state(), VadState::Speaking);
+        // From Speaking, a short silence (well below 700 ms) should not yet
+        // trigger a FallingEdge; counters were cleared.
+        let events = observe_n(&mut sm, 0.05, 5);
         assert!(events.is_empty(), "got {events:?}");
         assert_eq!(sm.state(), VadState::Speaking);
     }

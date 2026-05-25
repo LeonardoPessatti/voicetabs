@@ -40,7 +40,21 @@ pub fn run() {
 
     let audio_dir = paths::audio_dir().expect("audio dir");
     let active_tab = routing::ActiveTab::new();
-    let capture = capture::CaptureController::spawn(audio_dir, db.clone(), active_tab.clone());
+    // Mode handle + hotkey receiver are stubbed here; Task 7 reorganizes
+    // setup() to mount the real HotkeyManager and pass its subscribe()
+    // receiver in. For now, the controller still works in AlwaysOn mode and
+    // the hotkey arm in its select! just never fires because the dummy
+    // sender is dropped immediately.
+    let mode_handle = capture::CaptureModeHandle::new(capture::CaptureMode::AlwaysOn);
+    let (_dummy_hotkey_tx, dummy_hotkey_rx) =
+        crossbeam_channel::unbounded::<hotkey::HotkeyEvent>();
+    let capture = capture::CaptureController::spawn(
+        audio_dir,
+        db.clone(),
+        active_tab.clone(),
+        mode_handle,
+        dummy_hotkey_rx,
+    );
     let utt_rx = capture.utterance_receiver();
 
     // Backend identifier published to the frontend via SttStatus. Hardcoded

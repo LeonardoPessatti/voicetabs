@@ -7,7 +7,9 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::audio::{spawn_input_stream, AudioConfig, InputStreamHandle};
+use crate::capture::mode::{CaptureMode, CaptureModeHandle};
 use crate::db::{settings as settings_repo, Db};
+use crate::hotkey::HotkeyEvent;
 use crate::routing::ActiveTab;
 use crate::utterance::{builder::UtteranceConfig, FinalizedUtterance, UtteranceBuilder};
 use crate::vad::{VadEvent, VadModel, VadStateMachine, CHUNK_SAMPLES};
@@ -70,7 +72,13 @@ impl CaptureController {
     /// VAD rising edge (snapshot semantics). `active_tab` is read once at
     /// each rising edge as well; whatever the user does mid-utterance cannot
     /// change the routing.
-    pub fn spawn(output_dir: PathBuf, db: Db, active_tab: ActiveTab) -> Self {
+    pub fn spawn(
+        output_dir: PathBuf,
+        db: Db,
+        active_tab: ActiveTab,
+        mode: CaptureModeHandle,
+        hotkey_rx: Receiver<HotkeyEvent>,
+    ) -> Self {
         let (cmd_tx, cmd_rx) = unbounded::<Cmd>();
         let (utt_tx, utt_rx) = unbounded::<UtteranceFinalized>();
         let status = Arc::new(Mutex::new(CaptureStatus::Idle));
@@ -84,6 +92,8 @@ impl CaptureController {
                     output_dir,
                     db,
                     active_tab,
+                    mode,
+                    hotkey_rx,
                     utt_tx,
                 )
             })
@@ -121,6 +131,8 @@ fn worker_loop(
     output_dir: PathBuf,
     db: Db,
     active_tab: ActiveTab,
+    mode: CaptureModeHandle,
+    hotkey_rx: Receiver<HotkeyEvent>,
     utt_tx: Sender<UtteranceFinalized>,
 ) {
     let mut stream_handle: Option<InputStreamHandle> = None;
@@ -196,8 +208,62 @@ fn worker_loop(
                         &mut current_meta,
                         &db,
                         &active_tab,
+                        &mode,
                         &utt_tx,
                     );
+                }
+                recv(hotkey_rx) -> evt => {
+                    let Ok(evt) = evt else { continue };
+                    if mode.get() != CaptureMode::Ptt {
+                        // AlwaysOn: hotkey is informational only; drop.
+                        continue;
+                    }
+                    let ts_ms = unix_now_ms();
+                    match evt {
+                        HotkeyEvent::Press => {
+                            if current_meta.is_some() {
+                                // already in an utterance; treat as auto-repeat
+                                continue;
+                            }
+                            let Some(tab_id) = active_tab.snapshot() else {
+                                tracing::warn!("PTT press with no active tab; ignoring");
+                                continue;
+                            };
+                            let vocab_terms: Vec<String> =
+                                settings_repo::get::<Vec<String>>(&db, "vocab_terms")
+                                    .ok()
+                                    .flatten()
+                                    .unwrap_or_default();
+                            let language: String = settings_repo::get::<String>(&db, "language")
+                                .ok()
+                                .flatten()
+                                .unwrap_or_else(|| "pt".into());
+                            current_meta = Some(UtteranceMeta {
+                                start_tab_id: tab_id,
+                                vocab_terms,
+                                language,
+                            });
+                            // Force the VAD state machine into Speaking so a
+                            // VAD-driven FallingEdge in PTT mode is also
+                            // suppressed (we drop it in process_chunks).
+                            vad_sm.force_speaking();
+                            // Synthesize a rising edge into the builder so its
+                            // pre-roll bookkeeping runs.
+                            let _ = builder.on_vad_event(VadEvent::RisingEdge { timestamp_ms: ts_ms });
+                        }
+                        HotkeyEvent::Release => {
+                            let Some(meta) = current_meta.take() else {
+                                // spurious release; nothing to finalize
+                                continue;
+                            };
+                            if let Some(finalized) =
+                                builder.on_vad_event(VadEvent::FallingEdge { timestamp_ms: ts_ms })
+                            {
+                                publish_utterance(&utt_tx, finalized, meta);
+                            }
+                            vad_sm.force_idle();
+                        }
+                    }
                 }
             }
         } else {
@@ -234,6 +300,7 @@ fn process_chunks(
     current_meta: &mut Option<UtteranceMeta>,
     db: &Db,
     active_tab: &ActiveTab,
+    mode: &CaptureModeHandle,
     utt_tx: &Sender<UtteranceFinalized>,
 ) {
     while accumulator.len() >= CHUNK_SAMPLES {
@@ -246,6 +313,16 @@ fn process_chunks(
             }
         };
         let ts_ms = unix_now_ms();
+        // PTT mode: still observe VAD (so the model keeps running for any
+        // future hallucination filter that wants prob) and still feed the
+        // builder so the pre-roll buffer and max-duration cap apply, but do
+        // NOT let VAD edges start or finalize an utterance — the hotkey is
+        // the only authoritative boundary.
+        if mode.get() == CaptureMode::Ptt {
+            let _ = sm.observe(prob, ts_ms);
+            let _ = builder.push_frame(&chunk);
+            continue;
+        }
         if let Some(event) = sm.observe(prob, ts_ms) {
             // *** A3-CRITICAL SECTION ***
             // On rising edge, snapshot the active tab id AND the vocab list +
