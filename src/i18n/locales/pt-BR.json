@@ -21,6 +21,8 @@
     "vocabHeading": "Vocabulário",
     "vocabHint": "Um termo por linha. Termos vão para o prompt da transcrição.",
     "vocabPlaceholder": "Digite os termos…",
+    "showTimestamps": "Mostrar timestamps",
+    "showTimestampsHint": "Mostra a hora em cada cartão de segmento.",
     "captureHeading": "Captura",
     "captureMode": "Modo",
     "captureModeAlwaysOn": "Sempre ativo",

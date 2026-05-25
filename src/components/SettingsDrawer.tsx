@@ -8,6 +8,8 @@ import { VocabSettings } from "./VocabSettings";
 export function SettingsDrawer() {
   const { t } = useTranslation();
   const { drawerOpen, closeDrawer, uiLocale, setLocale } = useSettingsStore();
+  const showTimestamps = useSettingsStore((s) => s.showTimestamps);
+  const setShowTimestamps = useSettingsStore((s) => s.setShowTimestamps);
 
   if (!drawerOpen) return null;
 
@@ -29,6 +31,19 @@ export function SettingsDrawer() {
             <option value="pt-BR">{t("settings.languagePtBr")}</option>
             <option value="en">{t("settings.languageEn")}</option>
           </select>
+        </section>
+
+        <section className="drawer__section">
+          <label htmlFor="show-timestamps-toggle">
+            <input
+              id="show-timestamps-toggle"
+              type="checkbox"
+              checked={showTimestamps}
+              onChange={(e) => void setShowTimestamps(e.target.checked)}
+            />
+            {t("settings.showTimestamps")}
+          </label>
+          <small className="drawer__hint">{t("settings.showTimestampsHint")}</small>
         </section>
 
         <CaptureSettings />

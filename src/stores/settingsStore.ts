@@ -5,15 +5,18 @@ import i18n, { SupportedLocale, SUPPORTED_LOCALES } from "../i18n";
 
 const LOCALE_KEY = "ui_locale";
 const VOCAB_KEY = "vocab_terms";
+const TIMESTAMPS_KEY = "show_timestamps";
 
 type SettingsState = {
   uiLocale: SupportedLocale;
   drawerOpen: boolean;
   vocabTerms: string[];
+  showTimestamps: boolean;
 
   load: () => Promise<void>;
   setLocale: (locale: SupportedLocale) => Promise<void>;
   setVocabTerms: (terms: string[]) => Promise<void>;
+  setShowTimestamps: (value: boolean) => Promise<void>;
   openDrawer: () => void;
   closeDrawer: () => void;
 };
@@ -22,6 +25,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   uiLocale: "pt-BR",
   drawerOpen: false,
   vocabTerms: [],
+  showTimestamps: true,
 
   async load() {
     const stored = await settingsApi.get(LOCALE_KEY);
@@ -50,7 +54,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       }
     }
 
-    set({ uiLocale, vocabTerms });
+    const tsRaw = await settingsApi.get(TIMESTAMPS_KEY);
+    const showTimestamps = tsRaw === null ? true : tsRaw !== "false";
+
+    set({ uiLocale, vocabTerms, showTimestamps });
   },
 
   async setLocale(locale) {
@@ -64,6 +71,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     const cleaned = terms.map((t) => t.trim()).filter((t) => t.length > 0);
     await settingsApi.set(VOCAB_KEY, JSON.stringify(cleaned));
     set({ vocabTerms: cleaned });
+  },
+
+  async setShowTimestamps(value) {
+    await settingsApi.set(TIMESTAMPS_KEY, value ? "true" : "false");
+    set({ showTimestamps: value });
   },
 
   openDrawer() {
