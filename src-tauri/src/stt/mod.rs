@@ -1,6 +1,7 @@
 pub mod backend;
 pub mod client;
 pub mod framing;
+pub mod keyring;
 pub mod local;
 pub mod protocol;
 pub mod status;

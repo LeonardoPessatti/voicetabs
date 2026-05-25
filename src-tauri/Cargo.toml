@@ -39,7 +39,7 @@ windows = { version = "0.58", features = [
     "Win32_System_LibraryLoader",
     "Win32_Foundation",
 ] }
-keyring = "3"
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 secrecy = "0.10"
 async-trait = "0.1"
