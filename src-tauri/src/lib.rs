@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use tauri::{Emitter, Manager};
 
-use crate::capture::UtteranceFinalized;
+use crate::capture::{CaptureController, CaptureStatus, UtteranceFinalized};
 use crate::db::{segments as segments_repo, Db};
 use crate::hallucination::{evaluate, Decision, Input as HInput, Thresholds};
 use crate::stt::status::SttStatus;
@@ -125,6 +125,50 @@ pub fn run() {
             );
             let utt_rx = capture.utterance_receiver();
             app.manage(capture);
+
+            // Build the system tray (icon, menu, click handlers). The
+            // `should_exit` flag is set by the Quit menu item and checked by
+            // the window close handler installed below: when false, close
+            // hides to tray; when true, close proceeds and the app exits.
+            let tray = tray::TrayHandle::build(&app_handle).expect("build tray icon");
+            let should_exit = tray.should_exit();
+            app.manage(tray.clone());
+
+            // Intercept close events on the main window: hide to tray instead
+            // of quitting, unless the Quit menu item set `should_exit`.
+            if let Some(window) = app_handle.get_webview_window("main") {
+                let should_exit_for_window = should_exit.clone();
+                let app_handle_for_window = app_handle.clone();
+                window.on_window_event(move |evt| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = evt {
+                        if !should_exit_for_window.load(std::sync::atomic::Ordering::SeqCst) {
+                            api.prevent_close();
+                            if let Some(w) = app_handle_for_window.get_webview_window("main") {
+                                let _ = w.hide();
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Reflect capture state on the tray icon. The capture controller
+            // does not publish a stream of status changes today; we poll
+            // cheaply once a second. Phase 6 may replace this with an event.
+            {
+                let tray_for_poll = tray.clone();
+                let app_for_poll = app_handle.clone();
+                std::thread::Builder::new()
+                    .name("voicetabs-tray-poll".into())
+                    .spawn(move || loop {
+                        let capturing = app_for_poll
+                            .try_state::<CaptureController>()
+                            .map(|c| !matches!(c.status(), CaptureStatus::Idle))
+                            .unwrap_or(false);
+                        let _ = tray_for_poll.set_capturing(capturing);
+                        std::thread::sleep(std::time::Duration::from_millis(1000));
+                    })
+                    .expect("spawn tray poll thread");
+            }
 
             let model_path = resolve_model_path(&app_handle).expect("resolve model path");
             let worker_binary =
