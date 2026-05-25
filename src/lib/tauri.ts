@@ -136,3 +136,36 @@ export function listenSegmentCreated(
 ): Promise<UnlistenFn> {
   return listen<Segment>("segment-created", (e) => handler(e.payload));
 }
+
+// --- Hotkey ---
+export type BindingKind = "key" | "mouse";
+export type Binding = { kind: BindingKind; code: string };
+
+export const hotkeyApi = {
+  async get(): Promise<Binding | null> {
+    return await invoke<Binding | null>("hotkey_get_binding");
+  },
+  async set(binding: Binding): Promise<void> {
+    await invoke("hotkey_set_binding", { binding });
+  },
+  async clear(): Promise<void> {
+    await invoke("hotkey_clear_binding");
+  },
+  async captureNext(): Promise<Binding> {
+    // Blocks on the backend for up to 15s; the UI shows "Pressione…" until
+    // it resolves or throws.
+    return await invoke<Binding>("hotkey_capture_next");
+  },
+};
+
+// --- Capture mode ---
+export type CaptureMode = "always_on" | "ptt";
+
+export const captureModeApi = {
+  async get(): Promise<CaptureMode> {
+    return (await invoke<string>("capture_get_mode")) as CaptureMode;
+  },
+  async set(mode: CaptureMode): Promise<void> {
+    await invoke("capture_set_mode", { mode });
+  },
+};
