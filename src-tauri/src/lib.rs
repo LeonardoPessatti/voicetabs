@@ -40,22 +40,13 @@ pub fn run() {
 
     let audio_dir = paths::audio_dir().expect("audio dir");
     let active_tab = routing::ActiveTab::new();
-    // Mode handle + hotkey receiver are stubbed here; Task 7 reorganizes
-    // setup() to mount the real HotkeyManager and pass its subscribe()
-    // receiver in. For now, the controller still works in AlwaysOn mode and
-    // the hotkey arm in its select! just never fires because the dummy
-    // sender is dropped immediately.
-    let mode_handle = capture::CaptureModeHandle::new(capture::CaptureMode::AlwaysOn);
-    let (_dummy_hotkey_tx, dummy_hotkey_rx) =
-        crossbeam_channel::unbounded::<hotkey::HotkeyEvent>();
-    let capture = capture::CaptureController::spawn(
-        audio_dir,
-        db.clone(),
-        active_tab.clone(),
-        mode_handle,
-        dummy_hotkey_rx,
+
+    // Capture mode is loaded from settings (persisted across runs). The
+    // handle is `Send + Sync + Clone`: held by the Tauri state, the
+    // controller worker, and the `capture_set_mode` command.
+    let mode_handle = capture::CaptureModeHandle::new(
+        load_capture_mode(&db).unwrap_or(capture::CaptureMode::AlwaysOn),
     );
-    let utt_rx = capture.utterance_receiver();
 
     // Backend identifier published to the frontend via SttStatus. Hardcoded
     // to "cpu" today; Phase 7 will add an "openai" alternative.
@@ -66,12 +57,19 @@ pub fn run() {
     });
     let stt_status_for_state = stt_status.clone();
 
+    // Clone everything we need to move into the `setup` closure so the
+    // original handles remain available for the state slots above.
+    let db_for_setup = db.clone();
+    let active_tab_for_setup = active_tab.clone();
+    let mode_handle_for_setup = mode_handle.clone();
+    let audio_dir_for_setup = audio_dir.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(db.clone())
-        .manage(capture)
         .manage(active_tab.clone())
         .manage(stt_status_for_state)
+        .manage(mode_handle.clone())
         .invoke_handler(tauri::generate_handler![
             commands::tabs::tabs_list,
             commands::tabs::tabs_create,
@@ -92,6 +90,36 @@ pub fn run() {
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
+
+            // Mount the hotkey manager and restore the persisted binding (if
+            // any). Failures registering the binding are logged but
+            // non-fatal — the user can re-bind from the UI.
+            let hotkey_mgr = hotkey::HotkeyManager::new(app_handle.clone())
+                .expect("init hotkey manager");
+            if let Ok(Some(json)) =
+                db::settings::get::<serde_json::Value>(&db_for_setup, "hotkey_binding")
+            {
+                if let Ok(b) = serde_json::from_value::<hotkey::Binding>(json) {
+                    if let Err(e) = hotkey_mgr.set_binding(b) {
+                        tracing::warn!("failed to register persisted hotkey binding: {e}");
+                    }
+                }
+            }
+            let hotkey_rx = hotkey_mgr.subscribe();
+            app.manage(hotkey_mgr);
+
+            // Now spawn the capture controller with the real mode handle and
+            // hotkey receiver.
+            let capture = capture::CaptureController::spawn(
+                audio_dir_for_setup.clone(),
+                db_for_setup.clone(),
+                active_tab_for_setup.clone(),
+                mode_handle_for_setup.clone(),
+                hotkey_rx,
+            );
+            let utt_rx = capture.utterance_receiver();
+            app.manage(capture);
+
             let model_path = resolve_model_path(&app_handle).expect("resolve model path");
             let worker_binary =
                 resolve_worker_binary(&app_handle).expect("resolve worker binary");
@@ -156,6 +184,13 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn load_capture_mode(db: &Db) -> Option<capture::CaptureMode> {
+    db::settings::get::<String>(db, "capture_mode")
+        .ok()
+        .flatten()
+        .and_then(|s| capture::CaptureMode::parse(&s))
 }
 
 fn resolve_model_path(app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
