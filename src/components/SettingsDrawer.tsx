@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useSettingsStore } from "../stores/settingsStore";
 import { SupportedLocale } from "../i18n";
+import { BackendSettings } from "./BackendSettings";
 import { CaptureSettings } from "./CaptureSettings";
 import { VocabSettings } from "./VocabSettings";
 
@@ -48,6 +49,7 @@ export function SettingsDrawer() {
 
         <CaptureSettings />
         <VocabSettings />
+        <BackendSettings />
       </aside>
     </div>
   );
