@@ -244,10 +244,9 @@ fn load_capture_mode(db: &Db) -> Option<capture::CaptureMode> {
 }
 
 fn resolve_model_path(app: &tauri::AppHandle) -> anyhow::Result<PathBuf> {
-    // For now we bundle the `small` quantized model (~330 MB) so CPU
-    // transcription is usable. The CUDA build path will switch back to
-    // large-v3-turbo for ~0.3-0.8s/utterance on GTX 1060. Tracked in
-    // a follow-up.
+    // We bundle the `small` quantized model (~330 MB) for usable CPU
+    // transcription. Cloud transcription via the OpenAI backend (Phase 7)
+    // bypasses this entirely and uses `gpt-4o-mini-transcribe`.
     let p = app
         .path()
         .resolve(
