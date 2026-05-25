@@ -20,13 +20,48 @@ html, body, #root {
   height: 100%;
 }
 
+.tab-strip-wrap {
+  position: relative;
+  border-bottom: 1px solid #3a3a3a;
+}
+.tab-strip-wrap::before,
+.tab-strip-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 1;
+}
+.tab-strip-wrap::before {
+  left: 0;
+  background: linear-gradient(to right, #2a2a2a, transparent);
+}
+.tab-strip-wrap::after {
+  right: 0;
+  background: linear-gradient(to left, #2a2a2a, transparent);
+}
+.tab-strip-wrap.tab-strip-wrap--fade-left::before {
+  opacity: 1;
+}
+.tab-strip-wrap.tab-strip-wrap--fade-right::after {
+  opacity: 1;
+}
+
 .tab-strip {
   display: flex;
   align-items: stretch;
   background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
   user-select: none;
   min-height: 36px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab-strip::-webkit-scrollbar {
+  height: 6px;
 }
 
 .tab {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   closestCenter,
@@ -62,6 +62,7 @@ function SortableTab(props: {
     <div
       ref={setNodeRef}
       style={style}
+      data-tab-id={props.tab.id}
       aria-label={props.tab.title}
       className={`tab${props.isActive ? " tab--active" : ""}`}
       onClick={props.onSelect}
@@ -125,6 +126,42 @@ export function TabStrip({
   const [draft, setDraft] = useState("");
   const segmentsByTab = useSegmentsStore((s) => s.segmentsByTab);
 
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const [leftFade, setLeftFade] = useState(false);
+  const [rightFade, setRightFade] = useState(false);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const recompute = () => {
+      setLeftFade(el.scrollLeft > 4);
+      setRightFade(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    };
+    recompute();
+    el.addEventListener("scroll", recompute, { passive: true });
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(recompute)
+        : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", recompute);
+      ro?.disconnect();
+    };
+  }, [tabs.length]);
+
+  // Scroll the active tab into view when selection changes.
+  useEffect(() => {
+    if (activeId == null) return;
+    const el = stripRef.current?.querySelector(`[data-tab-id="${activeId}"]`);
+    if (el && "scrollIntoView" in el) {
+      (el as HTMLElement).scrollIntoView({
+        inline: "nearest",
+        block: "nearest",
+      });
+    }
+  }, [activeId]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
@@ -144,38 +181,48 @@ export function TabStrip({
     onReorder(reordered.map((t) => t.id));
   }
 
+  const wrapClass = [
+    "tab-strip-wrap",
+    leftFade ? "tab-strip-wrap--fade-left" : "",
+    rightFade ? "tab-strip-wrap--fade-right" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <div className="tab-strip" role="tablist">
-        <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
-          {tabs.map((tab) => (
-            <SortableTab
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === activeId}
-              isRenaming={renamingId === tab.id}
-              draft={draft}
-              setDraft={setDraft}
-              commitRename={() => commitRename(tab.id)}
-              cancelRename={() => setRenamingId(null)}
-              onSelect={() => onSelect(tab.id)}
-              beginRename={() => {
-                setRenamingId(tab.id);
-                setDraft(tab.title);
-              }}
-              onClose={() => onClose(tab.id)}
-              closeLabel={t("tabs.close")}
-              segmentCount={(segmentsByTab[tab.id] ?? []).length}
-            />
-          ))}
-        </SortableContext>
-        <button
-          className="tab-strip__new"
-          aria-label={t("tabs.newTab")}
-          onClick={onCreate}
-        >
-          +
-        </button>
+      <div className={wrapClass}>
+        <div ref={stripRef} className="tab-strip" role="tablist">
+          <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
+            {tabs.map((tab) => (
+              <SortableTab
+                key={tab.id}
+                tab={tab}
+                isActive={tab.id === activeId}
+                isRenaming={renamingId === tab.id}
+                draft={draft}
+                setDraft={setDraft}
+                commitRename={() => commitRename(tab.id)}
+                cancelRename={() => setRenamingId(null)}
+                onSelect={() => onSelect(tab.id)}
+                beginRename={() => {
+                  setRenamingId(tab.id);
+                  setDraft(tab.title);
+                }}
+                onClose={() => onClose(tab.id)}
+                closeLabel={t("tabs.close")}
+                segmentCount={(segmentsByTab[tab.id] ?? []).length}
+              />
+            ))}
+          </SortableContext>
+          <button
+            className="tab-strip__new"
+            aria-label={t("tabs.newTab")}
+            onClick={onCreate}
+          >
+            +
+          </button>
+        </div>
       </div>
     </DndContext>
   );

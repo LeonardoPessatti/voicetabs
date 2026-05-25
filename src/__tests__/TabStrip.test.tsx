@@ -116,6 +116,21 @@ describe("TabStrip", () => {
     expect(screen.queryByText("0")).toBeNull();
   });
 
+  it("wraps the strip in a fade container", () => {
+    render(
+      <TabStrip
+        tabs={[tab(1, "Alpha", 0)]}
+        activeId={1}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onRename={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    );
+    expect(document.querySelector(".tab-strip-wrap")).not.toBeNull();
+  });
+
   it("fires onCreate when clicking the + button", () => {
     const onCreate = vi.fn();
     render(
