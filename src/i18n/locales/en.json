@@ -56,7 +56,8 @@
     "emptyState": "Speak to get started.",
     "transcribingPlaceholder": "transcribing…",
     "copy": "Copy segment",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "emptyHint": "Start speaking to transcribe."
   },
   "stt": {
     "ready": "Ready",

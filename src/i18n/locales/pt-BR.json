@@ -56,7 +56,8 @@
     "emptyState": "Fale algo para começar.",
     "transcribingPlaceholder": "transcrevendo…",
     "copy": "Copiar segmento",
-    "copied": "Copiado!"
+    "copied": "Copiado!",
+    "emptyHint": "Comece a falar para transcrever."
   },
   "stt": {
     "ready": "Pronto",
