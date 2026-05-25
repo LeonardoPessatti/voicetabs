@@ -44,6 +44,30 @@ export default function App() {
     document.title = t("app.title");
   }, [t]);
 
+  // Ctrl+Tab / Ctrl+Shift+Tab cycle through tabs. We ignore the event while
+  // an editable element is focused so we never hijack tabbing inside an
+  // <input>, <textarea>, or contenteditable region (e.g. the rename field
+  // in TabStrip or the segment edit textarea).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!e.ctrlKey || e.key !== "Tab") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) {
+        return;
+      }
+      if (tabs.tabs.length === 0 || tabs.activeTabId == null) return;
+      e.preventDefault();
+      const idx = tabs.tabs.findIndex((tb) => tb.id === tabs.activeTabId);
+      if (idx < 0) return;
+      const delta = e.shiftKey ? -1 : 1;
+      const next = tabs.tabs[(idx + delta + tabs.tabs.length) % tabs.tabs.length];
+      void tabs.setActive(next.id);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tabs]);
+
   if (!tabs.loaded) {
     return <main className="app" />;
   }
