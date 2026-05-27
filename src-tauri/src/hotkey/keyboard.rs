@@ -71,18 +71,14 @@ impl KeyboardBackend {
         tx: Sender<Result<Binding, BindingError>>,
     ) -> anyhow::Result<()> {
         // Always at least catch Escape so the user can cancel from the
-        // keyboard. We also register a small set of common PTT keys (left/
-        // right ctrl, shift, alt, space, F13-F19); the user can bind a
-        // mouse button to capture from the mouse backend for anything else.
+        // keyboard. Plus F13-F24 — function keys that streamdecks/macros
+        // commonly emit and that Win32 `RegisterHotKey` accepts standalone.
+        // Modifier keys (Ctrl/Shift/Alt) and Space cannot be registered as
+        // standalone global hotkeys on Windows ("Unknown VKCode") so they're
+        // not in this fallback set; the mouse backend handles everything
+        // outside it.
         let common_codes = [
             Code::Escape,
-            Code::ControlLeft,
-            Code::ControlRight,
-            Code::ShiftLeft,
-            Code::ShiftRight,
-            Code::AltLeft,
-            Code::AltRight,
-            Code::Space,
             Code::F13,
             Code::F14,
             Code::F15,
@@ -90,6 +86,11 @@ impl KeyboardBackend {
             Code::F17,
             Code::F18,
             Code::F19,
+            Code::F20,
+            Code::F21,
+            Code::F22,
+            Code::F23,
+            Code::F24,
         ];
         *self.capture_tx.lock() = Some(tx);
         let capture_tx = self.capture_tx.clone();
@@ -101,25 +102,27 @@ impl KeyboardBackend {
         for code in common_codes {
             let shortcut = Shortcut::new(None, code);
             let capture_tx_for_handler = capture_tx.clone();
-            plugin
-                .on_shortcut(shortcut, move |_app, shortcut, event| {
-                    if event.state() != ShortcutState::Pressed {
-                        return;
-                    }
-                    // Only fire if capture is still armed; the manager clears
-                    // `capture_tx` after the first send so subsequent presses
-                    // are ignored.
-                    let Some(tx) = capture_tx_for_handler.lock().take() else {
-                        return;
-                    };
-                    if shortcut.key == Code::Escape {
-                        let _ = tx.send(Err(BindingError::Cancelled));
-                    } else {
-                        let code_str = format!("{:?}", shortcut.key);
-                        let _ = tx.send(Ok(Binding::key(code_str)));
-                    }
-                })
-                .map_err(|e| anyhow::anyhow!("register capture shortcut {code:?}: {e}"))?;
+            // Tolerate per-key registration failures — some VKs aren't
+            // valid global shortcuts on every platform. As long as at least
+            // one key registers (typically Escape) the user can still
+            // cancel; if they want a different binding they can use the
+            // mouse backend.
+            if let Err(e) = plugin.on_shortcut(shortcut, move |_app, shortcut, event| {
+                if event.state() != ShortcutState::Pressed {
+                    return;
+                }
+                let Some(tx) = capture_tx_for_handler.lock().take() else {
+                    return;
+                };
+                if shortcut.key == Code::Escape {
+                    let _ = tx.send(Err(BindingError::Cancelled));
+                } else {
+                    let code_str = format!("{:?}", shortcut.key);
+                    let _ = tx.send(Ok(Binding::key(code_str)));
+                }
+            }) {
+                tracing::warn!("skip capture shortcut {code:?}: {e}");
+            }
         }
         Ok(())
     }

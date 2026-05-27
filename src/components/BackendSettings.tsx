@@ -29,9 +29,27 @@ export function BackendSettings() {
   }
 
   async function onSaveKey() {
-    if (!keyDraft.trim()) return;
-    await saveOpenAiKey(keyDraft.trim());
-    setKeyDraft("");
+    setError(null);
+    const v = keyDraft.trim();
+    if (!v) {
+      setError(t("settings.backend.errorEmpty"));
+      return;
+    }
+    try {
+      await saveOpenAiKey(v);
+      setKeyDraft("");
+    } catch (e: unknown) {
+      setError((e as { message?: string })?.message ?? String(e));
+    }
+  }
+
+  async function onClearKey() {
+    setError(null);
+    try {
+      await clearOpenAiKey();
+    } catch (e: unknown) {
+      setError((e as { message?: string })?.message ?? String(e));
+    }
   }
 
   return (
@@ -72,7 +90,7 @@ export function BackendSettings() {
           <button type="button" onClick={() => void onSaveKey()}>
             {t("settings.backend.save")}
           </button>
-          <button type="button" onClick={() => void clearOpenAiKey()}>
+          <button type="button" onClick={() => void onClearKey()}>
             {t("settings.backend.clear")}
           </button>
         </div>

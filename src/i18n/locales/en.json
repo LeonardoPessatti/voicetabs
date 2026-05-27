@@ -45,7 +45,8 @@
       "configured": "Key configured ✓",
       "notConfigured": "No key configured",
       "disclaimer": "Audio is sent to api.openai.com. See OpenAI's privacy policy.",
-      "errorNoKey": "Set the OpenAI key before selecting this backend."
+      "errorNoKey": "Set the OpenAI key before selecting this backend.",
+      "errorEmpty": "Enter a key before saving."
     }
   },
   "capture": {

@@ -45,7 +45,8 @@
       "configured": "Chave configurada ✓",
       "notConfigured": "Nenhuma chave configurada",
       "disclaimer": "Áudio enviado para api.openai.com. Veja a política de privacidade da OpenAI.",
-      "errorNoKey": "Configure a chave da OpenAI antes de selecionar este backend."
+      "errorNoKey": "Configure a chave da OpenAI antes de selecionar este backend.",
+      "errorEmpty": "Digite a chave antes de salvar."
     }
   },
   "capture": {
