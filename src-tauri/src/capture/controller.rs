@@ -156,6 +156,10 @@ fn worker_loop(
                     match cmd {
                         Ok(Cmd::Start) => { /* already capturing */ }
                         Ok(Cmd::Stop) => {
+                            tracing::info!(
+                                "capture Stop received; has_in_progress_utterance={}",
+                                current_meta.is_some()
+                            );
                             // Flush any in-progress utterance instead of
                             // dropping samples on the floor. The user
                             // pressing Stop is an explicit "I'm done"
@@ -314,13 +318,15 @@ fn process_chunks(
     mode: &CaptureModeHandle,
     utt_tx: &Sender<UtteranceFinalized>,
 ) {
-    // Diagnostic: log max VAD prob + average chunk RMS once per second so
-    // we can tell at a glance whether the mic is producing audible signal
-    // and whether VAD is reacting. ~31 chunks/s (512 samples @ 16 kHz).
+    // Diagnostic: log max+avg VAD prob + average chunk RMS once per second
+    // so we can tell at a glance whether the mic is producing audible
+    // signal and whether VAD is reacting. ~31 chunks/s (512 samples @ 16 kHz).
     const DIAG_INTERVAL: usize = 31;
     static DIAG_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     static DIAG_PROB_MAX_THOUSANDTHS: std::sync::atomic::AtomicU32 =
         std::sync::atomic::AtomicU32::new(0);
+    static DIAG_PROB_SUM_THOUSANDTHS: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
     static DIAG_RMS_SUM_BIASED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     while accumulator.len() >= CHUNK_SAMPLES {
         let chunk: Vec<f32> = accumulator.drain(..CHUNK_SAMPLES).collect();
@@ -335,17 +341,21 @@ fn process_chunks(
             use std::sync::atomic::Ordering;
             let prob_t = (prob * 1000.0).clamp(0.0, 1000.0) as u32;
             DIAG_PROB_MAX_THOUSANDTHS.fetch_max(prob_t, Ordering::Relaxed);
+            DIAG_PROB_SUM_THOUSANDTHS.fetch_add(prob_t as u64, Ordering::Relaxed);
             let rms_db = crate::audio::rms_dbfs(&chunk);
             let rms_biased = ((rms_db + 200.0) * 10.0).clamp(0.0, 4000.0) as u64;
             DIAG_RMS_SUM_BIASED.fetch_add(rms_biased, Ordering::Relaxed);
             let c = DIAG_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
             if c % DIAG_INTERVAL == 0 {
                 let pmax = DIAG_PROB_MAX_THOUSANDTHS.swap(0, Ordering::Relaxed) as f32 / 1000.0;
+                let psum = DIAG_PROB_SUM_THOUSANDTHS.swap(0, Ordering::Relaxed) as f64;
+                let pavg = (psum / DIAG_INTERVAL as f64) / 1000.0;
                 let rms_sum = DIAG_RMS_SUM_BIASED.swap(0, Ordering::Relaxed) as f64;
                 let rms_avg = (rms_sum / DIAG_INTERVAL as f64) / 10.0 - 200.0;
                 tracing::info!(
-                    "vad_diag: max_prob_1s={:.3} avg_rms_1s={:.1} dBFS",
+                    "vad_diag: max_prob_1s={:.3} avg_prob_1s={:.3} avg_rms_1s={:.1} dBFS",
                     pmax,
+                    pavg,
                     rms_avg,
                 );
             }
@@ -362,6 +372,7 @@ fn process_chunks(
             continue;
         }
         if let Some(event) = sm.observe(prob, ts_ms) {
+            tracing::info!("vad_event: {event:?} at prob={prob:.3}");
             // *** A3-CRITICAL SECTION ***
             // On rising edge, snapshot the active tab id AND the vocab list +
             // language EXACTLY ONCE. From here until finalize, nothing reads
