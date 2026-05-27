@@ -367,6 +367,14 @@ fn process_chunks(
         // NOT let VAD edges start or finalize an utterance — the hotkey is
         // the only authoritative boundary.
         if mode.get() == CaptureMode::Ptt {
+            // Diagnostic: log this once per second so the user can tell the
+            // controller is in PTT mode (which silently drops VAD edges).
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static PTT_DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+            let c = PTT_DROP_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+            if c % DIAG_INTERVAL == 0 {
+                tracing::info!("mode=PTT: dropping VAD events (hotkey only)");
+            }
             let _ = sm.observe(prob, ts_ms);
             let _ = builder.push_frame(&chunk);
             continue;
