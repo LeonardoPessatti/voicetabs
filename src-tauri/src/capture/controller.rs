@@ -156,10 +156,21 @@ fn worker_loop(
                     match cmd {
                         Ok(Cmd::Start) => { /* already capturing */ }
                         Ok(Cmd::Stop) => {
+                            // Flush any in-progress utterance instead of
+                            // dropping samples on the floor. The user
+                            // pressing Stop is an explicit "I'm done"
+                            // boundary stronger than VAD trailing silence.
+                            if let Some(meta) = current_meta.take() {
+                                let ts_ms = unix_now_ms();
+                                if let Some(finalized) = builder
+                                    .on_vad_event(VadEvent::FallingEdge { timestamp_ms: ts_ms })
+                                {
+                                    publish_utterance(&utt_tx, finalized, meta);
+                                }
+                            }
                             stream_handle = None;
                             vad_sm.force_idle();
                             accumulator.clear();
-                            current_meta = None;
                             *status.lock() = CaptureStatus::Idle;
                         }
                         Err(_) => return,
