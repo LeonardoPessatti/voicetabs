@@ -286,6 +286,7 @@ fn worker_loop(
             match cmd_rx.recv() {
                 Ok(Cmd::Start) => match spawn_input_stream(AudioConfig::default(), 64) {
                     Ok(handle) => {
+                        tracing::info!("capture Start; mode={:?}", mode.get());
                         let device_name = crate::audio::default_input_name();
                         *status.lock() = CaptureStatus::Capturing { device_name };
                         stream_handle = Some(handle);
