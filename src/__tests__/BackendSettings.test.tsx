@@ -27,12 +27,11 @@ describe("BackendSettings", () => {
 
   it("renders both radio options and the local one selected by default", () => {
     render(<BackendSettings />);
-    expect(screen.getByLabelText(/Local/i)).toBeChecked();
-    expect(screen.getByLabelText(/OpenAI/i)).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /Local/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /OpenAI/i })).not.toBeChecked();
   });
 
-  it("shows the API key input when OpenAI is selected", () => {
-    useSettingsStore.setState({ backend: "openai", openaiKeySet: false });
+  it("shows the API key input regardless of selected backend", () => {
     render(<BackendSettings />);
     expect(screen.getByPlaceholderText(/sk-/i)).toBeInTheDocument();
     expect(
@@ -41,7 +40,6 @@ describe("BackendSettings", () => {
   });
 
   it("saves an entered key and shows configured state", async () => {
-    useSettingsStore.setState({ backend: "openai", openaiKeySet: false });
     render(<BackendSettings />);
     const input = screen.getByPlaceholderText(/sk-/i) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "sk-1234567890" } });

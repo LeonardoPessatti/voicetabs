@@ -94,6 +94,10 @@ impl KeyboardBackend {
         *self.capture_tx.lock() = Some(tx);
         let capture_tx = self.capture_tx.clone();
         let plugin = self.app.global_shortcut();
+        // Wipe any prior registration (active binding or a stale capture set
+        // from a previous attempt) so the per-code register loop below can't
+        // hit "already registered". `stop_capture` re-registers `current`.
+        let _ = plugin.unregister_all();
         for code in common_codes {
             let shortcut = Shortcut::new(None, code);
             let capture_tx_for_handler = capture_tx.clone();

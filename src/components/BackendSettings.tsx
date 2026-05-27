@@ -58,39 +58,37 @@ export function BackendSettings() {
         {t("settings.backend.openai")}
       </label>
 
-      {backend === "openai" && (
-        <div className="backend__openai">
-          <label htmlFor="openai-key">{t("settings.backend.apiKey")}</label>
-          <input
-            id="openai-key"
-            type="password"
-            placeholder={t("settings.backend.apiKeyPlaceholder")}
-            value={keyDraft}
-            onChange={(e) => setKeyDraft(e.target.value)}
-            autoComplete="off"
-          />
-          <div className="backend__key-actions">
-            <button type="button" onClick={() => void onSaveKey()}>
-              {t("settings.backend.save")}
-            </button>
-            <button type="button" onClick={() => void clearOpenAiKey()}>
-              {t("settings.backend.clear")}
-            </button>
-          </div>
-          <p
-            className={
-              openaiKeySet ? "backend__status--ok" : "backend__status--missing"
-            }
-          >
-            {openaiKeySet
-              ? t("settings.backend.configured")
-              : t("settings.backend.notConfigured")}
-          </p>
-          <p className="backend__disclaimer">
-            {t("settings.backend.disclaimer")}
-          </p>
+      <div className="backend__openai">
+        <label htmlFor="openai-key">{t("settings.backend.apiKey")}</label>
+        <input
+          id="openai-key"
+          type="password"
+          placeholder={t("settings.backend.apiKeyPlaceholder")}
+          value={keyDraft}
+          onChange={(e) => setKeyDraft(e.target.value)}
+          autoComplete="off"
+        />
+        <div className="backend__key-actions">
+          <button type="button" onClick={() => void onSaveKey()}>
+            {t("settings.backend.save")}
+          </button>
+          <button type="button" onClick={() => void clearOpenAiKey()}>
+            {t("settings.backend.clear")}
+          </button>
         </div>
-      )}
+        <p
+          className={
+            openaiKeySet ? "backend__status--ok" : "backend__status--missing"
+          }
+        >
+          {openaiKeySet
+            ? t("settings.backend.configured")
+            : t("settings.backend.notConfigured")}
+        </p>
+        <p className="backend__disclaimer">
+          {t("settings.backend.disclaimer")}
+        </p>
+      </div>
       {error && (
         <p role="alert" className="backend__error">
           {error}
