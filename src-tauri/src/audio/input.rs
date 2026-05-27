@@ -55,6 +55,7 @@ pub fn spawn_input_stream(
 ) -> Result<InputStreamHandle, AudioError> {
     let host = cpal::default_host();
     let device = host.default_input_device().ok_or(AudioError::NoDevice)?;
+    let device_name = device.name().unwrap_or_else(|_| "<unknown>".into());
 
     let supported = device
         .default_input_config()
@@ -66,10 +67,11 @@ pub fn spawn_input_stream(
     let stream_cfg: StreamConfig = supported.into();
 
     tracing::info!(
+        device = %device_name,
         sample_rate = device_sample_rate,
         channels = device_channels,
         format = ?sample_format,
-        "opening cpal input stream at device-native config"
+        "opening cpal input stream"
     );
 
     let (tx, rx) = bounded::<Vec<f32>>(channel_capacity);
