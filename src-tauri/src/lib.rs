@@ -406,6 +406,10 @@ async fn run_segment_pipeline(
     app: tauri::AppHandle,
     db: Db,
 ) {
+    use crate::stt::status::{SttStatus, SttStatusHandle};
+    let status_handle: Option<SttStatusHandle> = app
+        .try_state::<SttStatusHandle>()
+        .map(|s| s.inner().clone());
     let UtteranceFinalized {
         audio_path,
         samples,
@@ -458,6 +462,15 @@ async fn run_segment_pipeline(
                 r.avg_logprob,
                 r.duration_ms,
             );
+            // Restore Ready in case a previous failure left status=Error.
+            if let Some(sh) = &status_handle {
+                if matches!(sh.get(), SttStatus::Error { .. }) {
+                    sh.set(SttStatus::Ready {
+                        backend: backend.backend_id().into(),
+                        model_id: backend.model_id().into(),
+                    });
+                }
+            }
             r
         }
         Err(e) => {
@@ -466,6 +479,12 @@ async fn run_segment_pipeline(
                 request_id,
                 audio_path,
             );
+            // Surface to the UI so the status dot flips red instead of the
+            // failure being log-only. The next successful utterance will
+            // overwrite this back to Ready.
+            if let Some(sh) = &status_handle {
+                sh.set(SttStatus::Error { message: e.to_string() });
+            }
             return;
         }
     };
